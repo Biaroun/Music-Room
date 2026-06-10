@@ -1,0 +1,9 @@
+# IDE
+.idea/
+
+# Build
+backend/dist/
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
