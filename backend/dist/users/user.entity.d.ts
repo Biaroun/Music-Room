@@ -7,8 +7,8 @@ export declare class User {
     id: number;
     username: string;
     name: string;
-    mail: string;
-    mailisVerified: boolean;
+    email: string;
+    emailisVerified: boolean;
     password: string;
     oAuthProvider: OAuthProvider;
     bio: string;

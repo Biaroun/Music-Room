@@ -19,7 +19,7 @@ export class UsersService {
     return await this.userRepository.findOne({ where: { username } });
   }
 
-  async create(data: RegisterDto): Promise<User | null> {
+  async create(data: Partial<User>): Promise<User> {
     const user = this.userRepository.create(data);
     return await this.userRepository.save(user);
   }
