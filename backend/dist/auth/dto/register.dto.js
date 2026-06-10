@@ -12,14 +12,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RegisterDto = void 0;
 const class_validator_1 = require("class-validator");
 const match_decorator_1 = require("../decorators/match.decorator");
+const swagger_1 = require("@nestjs/swagger");
 class RegisterDto {
     username;
-    mail;
+    email;
     password;
     passwordConfirm;
 }
 exports.RegisterDto = RegisterDto;
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        example: 'johndoe',
+        description: 'Between 3 and 255 characters',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
     (0, class_validator_1.MinLength)(3),
@@ -27,13 +32,21 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "username", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        example: 'john@example.com',
+        description: 'Must be a valid email',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)({ message: "L'adresse email est obligatoire." }),
     (0, class_validator_1.IsEmail)({}, { message: "L'adresse email n'est pas valide." }),
     (0, class_validator_1.MaxLength)(255, { message: "L'adresse email est trop longue." }),
     __metadata("design:type", String)
-], RegisterDto.prototype, "mail", void 0);
+], RegisterDto.prototype, "email", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        example: 'Test1234!@#$',
+        description: 'Min 12 chars, must contain uppercase, lowercase, number and special char',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)({ message: 'Le mot de passe est obligatoire.' }),
     (0, class_validator_1.MinLength)(12, {
@@ -46,6 +59,10 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({
+        example: 'Test1234!@#$',
+        description: 'Must match password',
+    }),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)({ message: 'La confirmation du mot de passe est obligatoire.' }),
     (0, match_decorator_1.Match)('password', { message: 'Les mots de passe ne correspondent pas.' }),

@@ -21,8 +21,8 @@ let User = class User {
     id;
     username;
     name;
-    mail;
-    mailisVerified;
+    email;
+    emailisVerified;
     password;
     oAuthProvider;
     bio;
@@ -47,11 +47,11 @@ __decorate([
 __decorate([
     (0, typeorm_1.Column)({ unique: true, nullable: true }),
     __metadata("design:type", String)
-], User.prototype, "mail", void 0);
+], User.prototype, "email", void 0);
 __decorate([
     (0, typeorm_1.Column)({ default: false }),
     __metadata("design:type", Boolean)
-], User.prototype, "mailisVerified", void 0);
+], User.prototype, "emailisVerified", void 0);
 __decorate([
     (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
