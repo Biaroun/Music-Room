@@ -1,9 +1,32 @@
-# IDE
-.idea/
+# Dependencies
+backend/node_modules/
+mobile/node_modules/
+
+# Environment
+.env
+backend/.env
+mobile/.env
 
 # Build
 backend/dist/
-
-# Mobile
-mobile/node_modules/
 mobile/.expo/
+mobile/dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeORM migrations auto-generated
+backend/src/migrations/
+
+# Test coverage
+coverage/
