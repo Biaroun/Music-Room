@@ -18,6 +18,9 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(255, { message: "L'username est trop long." })
+  @Matches(/^[a-zA-Z0-9_-]+$/, {
+    message: "L'username ne peut contenir que des lettres, chiffres, - et _"
+  })
   username: string;
 
   @ApiProperty({
