@@ -1,22 +1,48 @@
-import React from "react";
-import { View, Text, Button, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import { colors, spacing, typography } from '../config/theme';
+import { useAuth } from '../context/AuthContext';
+
+type ServiceCard = {
+    title: string;
+    description: string;
+    screen: string;
+    emoji: string;
+}
+
+const SERVICES 
 
 export default function HomeScreen({ navigation }: any) {
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Home</Text>
-            <Button title="Go to settings" onPress={() => navigation.navigate('Settings')} />
+            <Text style={typography.h1}>Music Room</Text>
+            <Text style={[typography.caption, {marginBottom: spacing.xl}]}>
+                Your collaborative music experience
+            </Text>
+            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Settings')}>
+                <Text style={styles.buttonText}>Open Settings</Text>
+            </TouchableOpacity>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-},
-  title: { 
-    fontSize: 24, 
-    marginBottom: 16 },
+    container: { 
+        flex: 1, 
+        backgroundColor: colors.background,
+        alignItems: 'center', 
+        justifyContent: 'center',
+        padding: spacing.md, 
+    },
+    button: {
+        backgroundColor: colors.accent,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        borderRadius: 24,
+    },
+    buttonText: {
+        color: colors.background,
+        fontWeight: '700',
+        fontSize: 14,
+    },
 });
