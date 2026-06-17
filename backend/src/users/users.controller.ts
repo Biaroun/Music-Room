@@ -12,7 +12,5 @@ export class UsersController {
     getMe(@Req() req: any) {
 
         return req.user;
-        // ou
-        return { message: 'ok' };
     }
 }
