@@ -9,7 +9,33 @@ import {
 export enum OAuthProvider {
   LOCAL = 'local',
   GOOGLE = 'google',
-  FACEBOOK = 'facebook', // le sujet demande Facebook pas GitHub
+  FACEBOOK = 'facebook',
+}
+
+
+export enum MusicGenre {
+  RAP = 'rap',
+  RNB = 'rnb',
+  ROCK = 'rock',
+  POP = 'pop',
+  JAZZ = 'jazz',
+  CLASSICAL = 'classical',
+  ELECTRO = 'electro',
+  REGGAE = 'reggae',
+  METAL = 'metal',
+  COUNTRY = 'country',
+}
+
+export enum Visibility {
+  PUBLIC = 'public',
+  FRIENDS_ONLY = 'friends-only',
+  PRIVATE = 'private',
+}
+
+export interface VisibilitySettings {
+  username: Visibility;
+  bio: Visibility;
+  musicPreferences: Visibility;
 }
 
 @Entity()
@@ -39,14 +65,10 @@ export class User {
   bio: string;
 
   @Column('simple-array', { nullable: true })
-  musicpreferences: string[];
+  musicpreferences: MusicGenre[];
 
   @Column('simple-json', { nullable: true })
-  visibilitySettings: {
-    name: 'public' | 'friends-only' | 'private';
-    bio: 'public' | 'friends-only' | 'private';
-    musicPreferences: 'public' | 'friends-only' | 'private';
-  };
+  visibilitySettings: VisibilitySettings;
 
   @CreateDateColumn()
   createdAt: Date;
