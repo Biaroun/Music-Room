@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { LogsInterceptor } from './logs/logs.interceptor';
+import { AllExceptionsFilter } from './logs/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,6 +16,7 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new LogsInterceptor());
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   const config = new DocumentBuilder()
       .setTitle('Music Room API')
@@ -30,5 +32,6 @@ async function bootstrap() {
   console.log(
       `📖 Swagger available at http://localhost:${process.env.PORT ?? 3000}/api/docs`,
   );
+
 }
 bootstrap();
