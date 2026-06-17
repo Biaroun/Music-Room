@@ -1,6 +1,7 @@
 # Dependencies
 backend/node_modules/
 mobile/node_modules/
+/node_modules/
 
 # Environment
 .env
