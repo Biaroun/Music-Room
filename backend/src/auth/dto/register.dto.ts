@@ -21,7 +21,7 @@ export class RegisterDto {
   @Matches(/^[a-zA-Z0-9_-]+$/, {
     message: "L'username ne peut contenir que des lettres, chiffres, - et _"
   })
-  username: string;
+  username: string; 
 
   @ApiProperty({
     example: 'john@example.com',
