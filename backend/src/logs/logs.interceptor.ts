@@ -14,16 +14,16 @@ export class LogsInterceptor implements NestInterceptor {
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         const request = context.switchToHttp().getRequest();
-        const { method, url } = request;
+        const { method, url, user } = request;
         const start = Date.now();
 
-        this.logger.log(`→ ${method} ${url}`);
+        this.logger.log(`→ ${method} ${url} ${user ? `[user: ${user.username}]` : '[anonymous]'}`);
 
         return next.handle().pipe(
             tap({
                 next: () => {
                     const duration = Date.now() - start;
-                    this.logger.log(`← ${method} ${url} - ${duration}ms`);
+                    this.logger.log(`← ${method} ${url} - ${duration}ms ${user ? `[user: ${user.username}]` : '[anonymous]'}`);
                 },
                 error: (error) => {
                     const duration = Date.now() - start;
