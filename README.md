@@ -13,6 +13,17 @@ cd mobile && npm install && npm start
 ```
 
 ---
+### Mail (Mailtrap)
+Le projet utilise [Mailtrap](https://mailtrap.io) en mode **Sandbox** pour tester l'envoi d'emails (vérification de compte) sans jamais envoyer de vrais mails à de vraies adresses.
+
+1. Crée un compte gratuit sur [mailtrap.io](https://mailtrap.io)
+2. Va dans **Sandboxes** (menu de gauche) → ouvre **My Sandbox** (créée par défaut)
+3. Dans l'onglet **Integration**, choisis **SMTP**, tu trouveras :
+  - `Host` → à mettre dans `MAIL_HOST`
+  - `Port` → à mettre dans `MAIL_PORT` (utiliser `2525`)
+  - `Username` → à mettre dans `MAIL_USER`
+  - `Password` → à mettre dans `MAIL_PASSWORD`
+4. Les emails de vérification envoyés par l'app n'arrivent jamais dans une vraie boîte mail — ils apparaissent directement dans l'inbox Mailtrap, pratique pour debug sans spammer personne.
 
 ## Accéder au backend depuis l'émulateur
 
