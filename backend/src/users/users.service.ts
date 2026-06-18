@@ -1,16 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import {ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { RegisterDto } from '../auth/dto/register.dto';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
 import { randomBytes } from 'crypto';
+import {UpdateEmailDto} from "./dto/update-email.dto";
+import * as bcrypt from "bcrypt";
+import {MailService} from "../mail/mail.service";
+import {UpdatePasswordDto} from "./dto/update-password.dto";
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private mailService: MailService
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -40,8 +45,37 @@ export class UsersService {
     return !!user;
   }
 
-  async updateProfile(userID: number, data: UpdateProfileDto): Promise<User | null> {
-    const user = await this.userRepository.findOne({ where: { id: userID } });
+  async generateEmailVerificationToken(userId: number): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    await this.userRepository.update(userId, {
+      emailVerificationToken: token,
+      emailVerificationExpires: expires,
+    });
+
+    return token;
+  }
+
+  async verifyEmailToken(token: string) {
+    const user = await this.userRepository.findOne({
+      where: { emailVerificationToken: token }
+    });
+
+    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+      return false;
+    }
+
+    user.emailisVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await this.userRepository.save(user);
+
+    return true;
+  }
+
+  async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
+    const user = await this.findById(userId);
     if (!user) {
       return null;
     }
@@ -60,32 +94,44 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  async generateEmailVerificationToken(userId: number): Promise<string> {
-    const token = randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+  async updateEmail(userId: number, data: UpdateEmailDto): Promise<User | null> {
+    const user = await this.findById(userId);
+    if (!user)
+      return null;
 
-    await this.userRepository.update(userId, {
-      emailVerificationToken: token,
-      emailVerificationExpires: expires,
-    });
-
-    return token;
-  }
-
-  async verifyEmailToken(token: string): Promise<boolean> {
-    const user = await this.userRepository.findOne({
-      where: { emailVerificationToken: token }
-    });
-
-    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
-      return false;
+    if (!await bcrypt.compare(data.currentpassword, user.password)) {
+      throw new UnauthorizedException('Invalid email or password');
     }
 
-    user.emailisVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
-    await this.userRepository.save(user);
+    if (await this.isAlreadyExist('email', data.newemail)) {
+      throw new ConflictException('Email already exists');
+    }
 
-    return true;
+    const tokenverif = await this.generateEmailVerificationToken(user.id);
+    await this.mailService.sendVerificationEmail(data.newemail, tokenverif);
+
+    await this.userRepository.update(userId, {
+      email: data.newemail,
+      emailisVerified: false,
+    });
+
+    return await this.findById(userId);
   }
+
+  async updatePassword(userId: number, data: UpdatePasswordDto): Promise<User | null> {
+    const user = await this.findById(userId);
+    if (!user) {
+      return null;
+    }
+    if (!await bcrypt.compare(data.currentpassword, user.password)) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    await this.userRepository.update(userId, {
+      password: await bcrypt.hash(data.newpassword, 10),
+    });
+
+    return await this.findById(userId);
+  }
+
 }
