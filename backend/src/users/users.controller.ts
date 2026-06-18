@@ -4,6 +4,8 @@ import {ApiOperation, ApiResponse} from "@nestjs/swagger";
 import {CurrentUser} from "../auth/decorators/current-user.decorator";
 import { UsersService } from './users.service';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
+import {UpdateEmailDto} from "./dto/update-email.dto";
+import {UpdatePasswordDto} from "./dto/update-password.dto";
 
 @Controller('users')
 export class UsersController {
@@ -51,5 +53,33 @@ export class UsersController {
             musicpreferences: updatedUser.musicpreferences,
             visibilitySettings: updatedUser.visibilitySettings,
         };
+    }
+
+    @ApiOperation({ summary: 'update my email' })
+    @UseGuards(JwtAuthGuard)
+    @Patch('me/email')
+    async updateEmail(@CurrentUser() user: { id: number }, @Body() dto: UpdateEmailDto) {
+        const updatedUser = await this.usersService.updateEmail(user.id, dto);
+
+        if (!updatedUser) {
+            throw new NotFoundException('User not found');
+        }
+
+        return {
+            newmail: updatedUser.email,
+        };
+    }
+
+    @ApiOperation({ summary: 'update my password' })
+    @UseGuards(JwtAuthGuard)
+    @Patch('me/password')
+    async updatePassword(@CurrentUser() user: { id: number }, @Body() dto: UpdatePasswordDto) {
+        const updatedUser = await this.usersService.updatePassword(user.id, dto);
+
+        if (!updatedUser) {
+            throw new NotFoundException('User not found');
+        }
+
+        return { message: 'Password updated successfully' };
     }
 }
