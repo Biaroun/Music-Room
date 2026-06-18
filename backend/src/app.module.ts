@@ -8,6 +8,7 @@ import { TrackVoteModule } from './track-vote/track-vote.module';
 import { PlaylistEditorModule } from './playlist-editor/playlist-editor.module';
 import { MusicDelegationModule } from './music-delegation/music-delegation.module';
 import { LogsModule } from './logs/logs.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { LogsModule } from './logs/logs.module';
     PlaylistEditorModule,
     MusicDelegationModule,
     LogsModule,
+    MailModule,
   ],
 })
 export class AppModule {}
