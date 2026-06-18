@@ -5,6 +5,8 @@ import {ApiTags, ApiOperation, ApiResponse, ApiQuery} from '@nestjs/swagger';
 import {LoginDto} from "./dto/login.dto";
 import {MailService} from "../mail/mail.service";
 import {UsersService} from "../users/users.service";
+import { Res } from '@nestjs/common';
+import type { Response } from 'express';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -33,12 +35,27 @@ export class AuthController {
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
     @ApiQuery({ name: 'token', description: 'Email verification token', required: true })
     @Get('verify-email')
-    async verifyMail(@Query('token') token: string) {
+    async verifyMail(@Query('token') token: string, @Res() res: Response) {
         const success = await this.usersService.verifyEmailToken(token);
 
-        if (!success) {
-            throw new BadRequestException('Invalid or expired token');
-        }
-        return true;
+        const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Music Room - Email Verification</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; padding: 50px; background: #1a1a2e; color: white; }
+          h1 { color: ${success ? '#4ade80' : '#f87171'}; }
+        </style>
+      </head>
+      <body>
+        <h1>${success ? '✅ Email verified!' : '❌ Invalid or expired token'}</h1>
+        <p>${success ? 'You can now close this page and return to the app.' : 'Please request a new verification email.'}</p>
+      </body>
+    </html>
+  `;
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
     }
 }
