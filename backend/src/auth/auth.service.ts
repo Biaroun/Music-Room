@@ -5,11 +5,13 @@ import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
 import {JwtService} from "@nestjs/jwt";
 import {LoginDto} from "./dto/login.dto";
+import {MailService} from "../mail/mail.service";
 
 @Injectable()
 export class AuthService {
   constructor(private usersService: UsersService,
-              private jwtservice: JwtService,) {}
+              private jwtservice: JwtService,
+              private mailService: MailService) {}
 
   async register(data: RegisterDto): Promise<{ access_token: string }> {
     if (await this.usersService.isAlreadyExist('email', data.email)) {
@@ -24,6 +26,9 @@ export class AuthService {
       ...userData,
       password: hashedPassword,
     });
+
+    const tokenverif = await this.usersService.generateEmailVerificationToken(user.id);
+    await this.mailService.sendVerificationEmail(user.email, tokenverif);
     return {
       access_token: this.jwtservice.sign({ sub: user.id, username: user.username }),
     };
