@@ -70,6 +70,12 @@ export class User {
   @Column('simple-json', { nullable: true })
   visibilitySettings: VisibilitySettings;
 
+  @Column({ type: 'varchar', nullable: true })
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerificationExpires: Date | null;
+  
   @CreateDateColumn()
   createdAt: Date;
 

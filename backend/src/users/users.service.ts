@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { RegisterDto } from '../auth/dto/register.dto';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -57,5 +58,34 @@ export class UsersService {
       };
     }
     return await this.userRepository.save(user);
+  }
+
+  async generateEmailVerificationToken(userId: number): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    await this.userRepository.update(userId, {
+      emailVerificationToken: token,
+      emailVerificationExpires: expires,
+    });
+
+    return token;
+  }
+
+  async verifyEmailToken(token: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { emailVerificationToken: token }
+    });
+
+    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+      return false;
+    }
+
+    user.emailisVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await this.userRepository.save(user);
+
+    return true;
   }
 }
