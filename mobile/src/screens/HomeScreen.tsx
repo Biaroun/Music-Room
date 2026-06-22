@@ -10,7 +10,7 @@ type ServiceCard = {
     emoji: string;
 }
 
-const SERVICES 
+const SERVICES: ServiceCard[] = [];
 
 export default function HomeScreen({ navigation }: any) {
     return (
@@ -21,6 +21,9 @@ export default function HomeScreen({ navigation }: any) {
             </Text>
             <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Settings')}>
                 <Text style={styles.buttonText}>Open Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.button, { marginTop: spacing.md }]} onPress={() => navigation.navigate('Profile')}>
+                <Text style={styles.buttonText}>My Profile</Text>
             </TouchableOpacity>
         </View>
     );
