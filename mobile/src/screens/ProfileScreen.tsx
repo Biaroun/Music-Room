@@ -1,10 +1,12 @@
 // mobile/src/screens/ProfileScreen.tsx (read-only view)
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import { storage } from '../config/storage';
+import { getAvatar } from '../config/avatars';
 
 type Visibility = 'public' | 'friends-only' | 'private';
 type Me = {
@@ -19,12 +21,14 @@ type Me = {
 export default function ProfileScreen({ navigation }: any) {
   const { token } = useAuth();
   const [me, setMe] = useState<Me | null>(null);
+  const [avatarId, setAvatarId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Recharge à chaque fois que l'écran reprend le focus (donc après une édition).
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      storage.getItem('profile_avatar').then((v) => { if (active) setAvatarId(v || null); });
       apiFetch('/users/me', token)
         .then((data) => { if (active) setMe(data); })
         .catch((e: any) => Alert.alert('Error', e.message))
@@ -38,13 +42,18 @@ export default function ProfileScreen({ navigation }: any) {
 
   const genres = me?.musicpreferences ?? [];
   const vis = me?.visibilitySettings ?? {};
+  const av = getAvatar(avatarId);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{me?.username?.[0]?.toUpperCase() ?? '?'}</Text>
-        </View>
+        {av ? (
+          <Image source={av.source} style={styles.avatarImg} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{me?.username?.[0]?.toUpperCase() ?? '?'}</Text>
+          </View>
+        )}
         <Text style={typography.h1}>{me?.username}</Text>
         <Text style={typography.caption}>{me?.email}</Text>
         <View style={[styles.badge, { backgroundColor: me?.emailisVerified ? colors.accent : colors.surfaceAlt }]}>
@@ -83,8 +92,9 @@ export default function ProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { alignItems: 'center', marginBottom: spacing.md },
-  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
-  avatarText: { color: colors.background, fontSize: 30, fontWeight: '700' },
+  avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  avatarImg: { width: 110, height: 110, borderRadius: 55, marginBottom: spacing.sm },
+  avatarText: { color: colors.background, fontSize: 44, fontWeight: '700' },
   badge: { marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
   badgeText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' },
   section: { marginTop: spacing.lg, marginBottom: spacing.sm },

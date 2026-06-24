@@ -1,9 +1,11 @@
 // mobile/src/screens/EditProfileScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import { storage } from '../config/storage';
+import { AVATARS } from '../config/avatars';
 
 type MusicGenre = 'rap' | 'rnb' | 'rock' | 'pop' | 'jazz' | 'classical' | 'electro' | 'reggae' | 'metal' | 'country';
 type Visibility = 'public' | 'friends-only' | 'private';
@@ -26,8 +28,10 @@ export default function EditProfileScreen({ navigation }: any) {
   const [visibility, setVisibility] = useState<Record<VisibilityField, Visibility>>({
     username: 'public', bio: 'public', musicPreferences: 'public',
   });
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
+    storage.getItem('profile_avatar').then((v) => setAvatar(v || null));
     apiFetch('/users/me', token)
       .then((me) => {
         setBio(me.bio ?? '');
@@ -49,6 +53,7 @@ export default function EditProfileScreen({ navigation }: any) {
         method: 'PATCH',
         body: JSON.stringify({ bio, musicpreferences: genres, visibilitySettings: visibility }),
       });
+      await storage.setItem('profile_avatar', avatar ?? '');
       Alert.alert('Saved', 'Profile updated');
       navigation.goBack();
     } catch (e: any) {
@@ -64,6 +69,22 @@ export default function EditProfileScreen({ navigation }: any) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>
       <Text style={typography.h1}>Edit profile</Text>
+
+      <Text style={[typography.h2, styles.section]}>Avatar</Text>
+      <View style={styles.avatars}>
+        {AVATARS.map((a) => {
+          const active = avatar === a.id;
+          return (
+            <TouchableOpacity
+              key={a.id}
+              onPress={() => setAvatar(a.id)}
+              style={[styles.avatarPick, active && styles.avatarPickActive]}
+            >
+              <Image source={a.source} style={styles.avatarPickImg} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <Text style={[typography.h2, styles.section]}>Bio</Text>
       <TextInput
@@ -115,6 +136,10 @@ export default function EditProfileScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   section: { marginTop: spacing.lg, marginBottom: spacing.sm },
+  avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  avatarPick: { width: 72, height: 72, borderRadius: 36, overflow: 'hidden', borderWidth: 3, borderColor: 'transparent' },
+  avatarPickActive: { borderColor: colors.textPrimary },
+  avatarPickImg: { width: '100%', height: '100%' },
   input: { backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 8, padding: spacing.md, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: 16, backgroundColor: colors.surface },
