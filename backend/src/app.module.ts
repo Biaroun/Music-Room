@@ -9,6 +9,7 @@ import { PlaylistEditorModule } from './playlist-editor/playlist-editor.module';
 import { MusicDelegationModule } from './music-delegation/music-delegation.module';
 import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
+import { FriendshipModule } from './friendship/friendship.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MailModule } from './mail/mail.module';
     MusicDelegationModule,
     LogsModule,
     MailModule,
+    FriendshipModule,
   ],
 })
 export class AppModule {}
