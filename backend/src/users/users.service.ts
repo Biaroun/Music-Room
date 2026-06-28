@@ -19,15 +19,20 @@ export class UsersService {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { email } });
+    return await this.userRepository.findOne({
+      where: { email },
+      select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true }
+    });
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { username } });
+    return await this.userRepository.findOne({ where: { username },
+      select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true }});
   }
 
   async findById(id: number): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { id } });
+    return await this.userRepository.findOne({ where: { id },
+      select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true }});
   }
 
   async create(data: Partial<User>): Promise<User> {

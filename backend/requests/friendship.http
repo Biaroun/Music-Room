@@ -1,0 +1,155 @@
+### ===========================================
+### FRIENDSHIP - FULL DYNAMIC TEST FLOW (v2 - response handler scripts)
+### Exécute les requêtes DANS L'ORDRE, de haut en bas, une par une.
+### Les tokens et ids sont capturés automatiquement via client.global.set().
+### ===========================================
+
+### 0. Login User 10 (testuser01) -> saves token10
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser01",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token10", response.body.access_token);
+%}
+
+### 0. Login User 11 (testuser02) -> saves token11
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser02",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token11", response.body.access_token);
+%}
+
+### 0. Login User 12 (testuser03) -> saves token12
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser03",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token12", response.body.access_token);
+%}
+
+### 0. Login User 13 (testuser04) -> saves token13
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser04",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token13", response.body.access_token);
+%}
+
+
+### ===== HAPPY PATH: send -> accept =====
+
+### 1. User10 sends a friend request to User11 -> saves requestId1011
+POST http://localhost:3000/friendship/request/11
+Authorization: Bearer {{token10}}
+
+> {%
+    client.global.set("requestId1011", response.body.id);
+%}
+
+### 2. User10 tries to send again -> should be 409 Conflict
+POST http://localhost:3000/friendship/request/11
+Authorization: Bearer {{token10}}
+
+### 3. User11 checks pending requests received
+GET http://localhost:3000/friendship/pending
+Authorization: Bearer {{token11}}
+
+### 4. User11 accepts the request (uses the id saved at step 1)
+PATCH http://localhost:3000/friendship/{{requestId1011}}/accept
+Authorization: Bearer {{token11}}
+
+### 5. User10 checks friends list -> should include User11
+GET http://localhost:3000/friendship/friends
+Authorization: Bearer {{token10}}
+
+### 6. User11 checks friends list -> should include User10
+GET http://localhost:3000/friendship/friends
+Authorization: Bearer {{token11}}
+
+
+### ===== AUTO-ACCEPT PATH: mutual request =====
+
+### 7. User10 sends a request to User12
+POST http://localhost:3000/friendship/request/12
+Authorization: Bearer {{token10}}
+
+### 8. User12 sends a request back to User10 -> auto-accepts instead of duplicating
+POST http://localhost:3000/friendship/request/10
+Authorization: Bearer {{token12}}
+
+### 9. Confirm User12 and User10 are now friends
+GET http://localhost:3000/friendship/friends
+Authorization: Bearer {{token12}}
+
+
+### ===== REJECT PATH =====
+
+### 10. User11 sends a request to User13 -> saves requestId1113
+POST http://localhost:3000/friendship/request/13
+Authorization: Bearer {{token11}}
+
+> {%
+    client.global.set("requestId1113", response.body.id);
+%}
+
+### 11. User13 rejects it directly using the id saved at step 10
+PATCH http://localhost:3000/friendship/{{requestId1113}}/reject
+Authorization: Bearer {{token13}}
+
+### 12. Confirm it's gone from User13's pending list
+GET http://localhost:3000/friendship/pending
+Authorization: Bearer {{token13}}
+
+
+### ===== BLOCK / UNBLOCK PATH =====
+
+### 13. User10 blocks User13 -> saves blockId1013
+POST http://localhost:3000/friendship/block/13
+Authorization: Bearer {{token10}}
+
+> {%
+    client.global.set("blockId1013", response.body.id);
+%}
+
+### 14. User10 checks blocked list
+GET http://localhost:3000/friendship/blocked
+Authorization: Bearer {{token10}}
+
+### 15. User10 unblocks User13 using the id saved at step 13
+DELETE http://localhost:3000/friendship/block/{{blockId1013}}
+Authorization: Bearer {{token10}}
+
+### 16. Confirm blocked list is empty again
+GET http://localhost:3000/friendship/blocked
+Authorization: Bearer {{token10}}
+
+
+### ===== SECURITY CHECKS =====
+
+### 17. User12 tries to accept a request that isn't theirs -> should 404
+PATCH http://localhost:3000/friendship/{{requestId1011}}/accept
+Authorization: Bearer {{token12}}
+
+### 18. No token -> should 401
+GET http://localhost:3000/friendship/friends

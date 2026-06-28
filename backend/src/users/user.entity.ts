@@ -55,7 +55,7 @@ export class User {
   @Column({ default: false })
   emailisVerified: boolean;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, select: false})
   password: string;
 
   @Column({ type: 'enum', enum: OAuthProvider, default: OAuthProvider.LOCAL })
