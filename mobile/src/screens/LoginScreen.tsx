@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
-import { API_URL } from '../config/api';
+import { apiFetch } from '../config/api';
 
 export default function LoginScreen({ navigation }: any) {
   const [login, setLogin] = useState('');
@@ -11,18 +11,14 @@ export default function LoginScreen({ navigation }: any) {
   const { login: authLogin } = useAuth();
 
   async function handleLogin() {
-    if (!login || !password) 
+    if (!login || !password)
       return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const data = await apiFetch('/auth/login', null, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login, password }),
       });
-      const data = await res.json();
-      if (!res.ok) 
-        throw new Error(data.message || 'Login failed');
       await authLogin(data.access_token);
     } catch (e: any) {
       Alert.alert('Error', e.message);
