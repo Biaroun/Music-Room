@@ -12,6 +12,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import PlaylistEditorScreen from './src/screens/PlaylistEditorScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -40,6 +41,7 @@ function Navigation() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerTransparent: true, headerTitle: '' }}/>
           <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} /> 
         </>
       ) : (

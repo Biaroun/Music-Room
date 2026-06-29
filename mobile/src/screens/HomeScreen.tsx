@@ -10,6 +10,7 @@ const SHORTCUTS: Shortcut[] = [
   { title: 'My Profile', emoji: '👤', screen: 'Profile', color: '#8b5cf6' },
   { title: 'Settings', emoji: '⚙️', screen: 'Settings', color: '#3b82f6' },
   { title: 'Track Vote', emoji: '🗳️', color: '#e8115b', soon: true },
+  { title: 'Friend', emoji: '👥', screen: 'Friends', color: '#1DB954' },
 ];
 
 function greeting() {

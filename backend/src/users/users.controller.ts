@@ -1,4 +1,4 @@
-import {Body, Controller, Get, NotFoundException, Patch, Req, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, NotFoundException, Patch, Query, UseGuards} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {ApiOperation, ApiResponse} from "@nestjs/swagger";
 import {CurrentUser} from "../auth/decorators/current-user.decorator";
@@ -11,6 +11,15 @@ import {UpdatePasswordDto} from "./dto/update-password.dto";
 export class UsersController {
     constructor(private usersService: UsersService) {}
 
+
+    @ApiOperation({ summary: 'Search users by username' })
+    @UseGuards(JwtAuthGuard)
+    @Get('search')
+    async searchUsers(@Query('q') query: string, @CurrentUser() user: { id: number }) {
+        if (!query || query.length < 2) return [];
+        const users = await this.usersService.searchByUsername(query, user.id);
+        return users.map(u => ({ id: u.id, username: u.username }));
+    }
 
     @ApiOperation({ summary: 'info about me' })
     @UseGuards(JwtAuthGuard)

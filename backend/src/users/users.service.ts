@@ -79,6 +79,16 @@ export class UsersService {
     return true;
   }
 
+  async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) LIKE :q', { q: `%${query.toLowerCase()}%` })
+      .andWhere('user.id != :excludeId', { excludeId: excludeUserId })
+      .select(['user.id', 'user.username'])
+      .limit(20)
+      .getMany();
+  }
+
   async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user) {
