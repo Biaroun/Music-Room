@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
-import { API_URL } from '../config/api';
+import { apiFetch } from '../config/api';
 
 export default function RegisterScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
@@ -16,13 +16,10 @@ export default function RegisterScreen({ navigation }: any) {
     if (!username || !email || !password || !passwordConfirm) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/register`, {
+      const data = await apiFetch('/auth/register', null, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password, passwordConfirm }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Registration failed');
       await authLogin(data.access_token);
     } catch (e: any) {
       Alert.alert('Error', e.message);
