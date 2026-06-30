@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 import { colors } from './src/config/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ToastProvider } from './src/components/Toast';
 
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -41,7 +42,7 @@ function Navigation() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerTransparent: true, headerTitle: '' }}/>
+          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }}/>
           <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} /> 
         </>
       ) : (
@@ -57,9 +58,11 @@ function Navigation() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <Navigation />
-      </NavigationContainer>
+      <ToastProvider>
+        <NavigationContainer>
+          <Navigation />
+        </NavigationContainer>
+      </ToastProvider>
     </AuthProvider>
   );
 }
