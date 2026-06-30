@@ -31,12 +31,12 @@ export default function EditProfileScreen({ navigation }: any) {
   const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    storage.getItem('profile_avatar').then((v) => setAvatar(v || null));
     apiFetch('/users/me', token)
       .then((me) => {
         setBio(me.bio ?? '');
         setGenres(me.musicpreferences ?? []);
         setVisibility((v) => ({ ...v, ...(me.visibilitySettings ?? {}) }));
+        setAvatar(me.avatar ?? null);
       })
       .catch((e: any) => Alert.alert('Error', e.message))
       .finally(() => setLoading(false));
@@ -51,7 +51,7 @@ export default function EditProfileScreen({ navigation }: any) {
     try {
       await apiFetch('/users/me', token, {
         method: 'PATCH',
-        body: JSON.stringify({ bio, musicpreferences: genres, visibilitySettings: visibility }),
+        body: JSON.stringify({ bio, musicpreferences: genres, visibilitySettings: visibility, avatar: avatar ?? '' }),
       });
       await storage.setItem('profile_avatar', avatar ?? '');
       Alert.alert('Saved', 'Profile updated');

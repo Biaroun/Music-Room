@@ -80,13 +80,18 @@ export class UsersService {
   }
 
   async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
-    return this.userRepository
+    const qb = this.userRepository
       .createQueryBuilder('user')
-      .where('LOWER(user.username) LIKE :q', { q: `%${query.toLowerCase()}%` })
-      .andWhere('user.id != :excludeId', { excludeId: excludeUserId })
-      .select(['user.id', 'user.username'])
-      .limit(20)
-      .getMany();
+      .where('user.id != :excludeId', { excludeId: excludeUserId })
+      .select(['user.id', 'user.username', 'user.avatar'])
+      .orderBy('user.username', 'ASC')
+      .limit(50);
+
+    if (query) {
+      qb.andWhere('LOWER(user.username) LIKE :q', { q: `%${query.toLowerCase()}%` });
+    }
+
+    return qb.getMany();
   }
 
   async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
@@ -96,6 +101,9 @@ export class UsersService {
     }
     if (data.bio) {
       user.bio = data.bio;
+    }
+    if (data.avatar !== undefined) {
+      user.avatar = data.avatar;
     }
     if (data.musicpreferences) {
       user.musicpreferences = [...new Set(data.musicpreferences)];

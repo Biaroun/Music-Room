@@ -12,13 +12,12 @@ export class UsersController {
     constructor(private usersService: UsersService) {}
 
 
-    @ApiOperation({ summary: 'Search users by username' })
+    @ApiOperation({ summary: 'Search or list users by username' })
     @UseGuards(JwtAuthGuard)
     @Get('search')
     async searchUsers(@Query('q') query: string, @CurrentUser() user: { id: number }) {
-        if (!query || query.length < 2) return [];
-        const users = await this.usersService.searchByUsername(query, user.id);
-        return users.map(u => ({ id: u.id, username: u.username }));
+        const users = await this.usersService.searchByUsername(query ?? '', user.id);
+        return users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar }));
     }
 
     @ApiOperation({ summary: 'info about me' })
@@ -38,6 +37,7 @@ export class UsersController {
             emailisVerified: fulluser.emailisVerified,
             musicpreferences: fulluser.musicpreferences,
             bio: fulluser.bio,
+            avatar: fulluser.avatar,
             visibilitySettings: fulluser.visibilitySettings,
             oAuthProvider: fulluser.oAuthProvider,
             createdAt: fulluser.createdAt,
@@ -59,6 +59,7 @@ export class UsersController {
             id: updatedUser.id,
             username: updatedUser.username,
             bio: updatedUser.bio,
+            avatar: updatedUser.avatar,
             musicpreferences: updatedUser.musicpreferences,
             visibilitySettings: updatedUser.visibilitySettings,
         };
