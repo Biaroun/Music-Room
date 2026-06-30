@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, typography, spacing } from '../config/theme';
-import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import { useToast } from '../components/Toast';
 
 export default function RegisterScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
@@ -10,19 +10,20 @@ export default function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login: authLogin } = useAuth();
+  const { showToast } = useToast();
 
   async function handleRegister() {
     if (!username || !email || !password || !passwordConfirm) return;
     setLoading(true);
     try {
-      const data = await apiFetch('/auth/register', null, {
+      await apiFetch('/auth/register', null, {
         method: 'POST',
         body: JSON.stringify({ username, email, password, passwordConfirm }),
       });
-      await authLogin(data.access_token);
+      showToast({ type: 'success', message: 'Account created! Please log in.' });
+      navigation.navigate('Login', { email });
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showToast({ type: 'error', message: e.message });
     } finally {
       setLoading(false);
     }
