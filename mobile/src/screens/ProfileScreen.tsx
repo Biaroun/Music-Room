@@ -1,11 +1,11 @@
 // mobile/src/screens/ProfileScreen.tsx (read-only view)
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
-import { storage } from '../config/storage';
 import { getAvatar } from '../config/avatars';
 
 type Visibility = 'public' | 'friends-only' | 'private';
@@ -14,6 +14,7 @@ type Me = {
   email: string;
   emailisVerified: boolean;
   bio?: string | null;
+  avatar?: string | null;
   musicpreferences?: string[] | null;
   visibilitySettings?: { username?: Visibility; bio?: Visibility; musicPreferences?: Visibility } | null;
 };
@@ -21,14 +22,11 @@ type Me = {
 export default function ProfileScreen({ navigation }: any) {
   const { token } = useAuth();
   const [me, setMe] = useState<Me | null>(null);
-  const [avatarId, setAvatarId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Recharge à chaque fois que l'écran reprend le focus (donc après une édition).
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      storage.getItem('profile_avatar').then((v) => { if (active) setAvatarId(v || null); });
       apiFetch('/users/me', token)
         .then((data) => { if (active) setMe(data); })
         .catch((e: any) => Alert.alert('Error', e.message))
@@ -42,7 +40,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const genres = me?.musicpreferences ?? [];
   const vis = me?.visibilitySettings ?? {};
-  const av = getAvatar(avatarId);
+  const av = getAvatar(me?.avatar);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>
@@ -57,7 +55,8 @@ export default function ProfileScreen({ navigation }: any) {
         <Text style={typography.h1}>{me?.username}</Text>
         <Text style={typography.caption}>{me?.email}</Text>
         <View style={[styles.badge, { backgroundColor: me?.emailisVerified ? colors.accent : colors.surfaceAlt }]}>
-          <Text style={styles.badgeText}>{me?.emailisVerified ? '✓ Email verified' : '✗ Email not verified'}</Text>
+          <Ionicons name={me?.emailisVerified ? 'checkmark-circle' : 'close-circle'} size={12} color={colors.textPrimary} />
+          <Text style={styles.badgeText}>{me?.emailisVerified ? ' Email verified' : ' Email not verified'}</Text>
         </View>
       </View>
 
@@ -95,7 +94,7 @@ const styles = StyleSheet.create({
   avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   avatarImg: { width: 110, height: 110, borderRadius: 55, marginBottom: spacing.sm },
   avatarText: { color: colors.background, fontSize: 44, fontWeight: '700' },
-  badge: { marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
+  badge: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
   badgeText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' },
   section: { marginTop: spacing.lg, marginBottom: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

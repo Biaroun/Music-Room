@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../config/theme';
 
 type Track = { id: string; title: string; artist: string };
@@ -52,7 +53,7 @@ export default function PlaylistEditorScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.cover}
         >
-          <Text style={styles.coverIcon}>♪</Text>
+          <Ionicons name="musical-note" size={64} color={colors.textPrimary} />
         </LinearGradient>
 
         <TextInput
@@ -74,7 +75,7 @@ export default function PlaylistEditorScreen() {
         </View>
 
         <TouchableOpacity style={styles.playFab} activeOpacity={0.85}>
-          <Text style={styles.playIcon}>▶</Text>
+          <Ionicons name="play" size={22} color="#000" />
         </TouchableOpacity>
       </LinearGradient>
 
@@ -90,9 +91,9 @@ export default function PlaylistEditorScreen() {
               <Text style={styles.trackTitle} numberOfLines={1}>{tk.title}</Text>
               <Text style={styles.trackArtist} numberOfLines={1}>{tk.artist}</Text>
             </View>
-            <TouchableOpacity onPress={() => move(i, -1)} style={styles.ctrl}><Text style={styles.ctrlIcon}>▲</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => move(i, 1)} style={styles.ctrl}><Text style={styles.ctrlIcon}>▼</Text></TouchableOpacity>
-            <TouchableOpacity onPress={() => removeTrack(tk.id)} style={styles.ctrl}><Text style={[styles.ctrlIcon, { color: '#f87171' }]}>✕</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => move(i, -1)} style={styles.ctrl}><Ionicons name="chevron-up" size={16} color={colors.textSecondary} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => move(i, 1)} style={styles.ctrl}><Ionicons name="chevron-down" size={16} color={colors.textSecondary} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => removeTrack(tk.id)} style={styles.ctrl}><Ionicons name="close" size={16} color="#f87171" /></TouchableOpacity>
           </View>
         ))}
         {tracks.length === 0 && <Text style={styles.empty}>No tracks yet. Add the first one below.</Text>}
@@ -104,7 +105,7 @@ export default function PlaylistEditorScreen() {
         <TextInput style={styles.input} value={artist} onChangeText={setArtist}
           placeholder="Artist" placeholderTextColor={colors.textSecondary} />
         <TouchableOpacity style={styles.addBtn} onPress={addTrack} activeOpacity={0.85}>
-          <Text style={styles.addBtnText}>＋  Add track</Text>
+          <Ionicons name="add" size={16} color="#000" /><Text style={styles.addBtnText}>  Add track</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -123,7 +124,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg,
     shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 12 }, elevation: 12,
   },
-  coverIcon: { fontSize: 64, color: colors.textPrimary },
   titleInput: { fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, padding: 0 },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   meta: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
@@ -134,7 +134,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 6 }, elevation: 8,
   },
-  playIcon: { color: '#000', fontSize: 22, marginLeft: 3 },
 
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
@@ -145,11 +144,10 @@ const styles = StyleSheet.create({
   trackTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   trackArtist: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
   ctrl: { paddingHorizontal: 6, paddingVertical: spacing.xs },
-  ctrlIcon: { color: colors.textSecondary, fontSize: 15, fontWeight: '700' },
   empty: { color: colors.textSecondary, fontSize: 14, paddingVertical: spacing.md },
 
   addTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: spacing.xl, marginBottom: spacing.md },
   input: { backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 6, padding: spacing.md, marginBottom: spacing.sm, fontSize: 14 },
-  addBtn: { alignSelf: 'flex-start', backgroundColor: colors.accent, borderRadius: 24, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
+  addBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent, borderRadius: 24, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
   addBtnText: { color: '#000', fontWeight: '800', fontSize: 14 },
 });

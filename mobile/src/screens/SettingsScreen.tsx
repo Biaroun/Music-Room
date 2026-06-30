@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
@@ -67,7 +68,8 @@ export default function SettingsScreen({ navigation }: any) {
         <Text style={typography.h2}>{me?.username}</Text>
         <Text style={typography.caption}>{me?.email}</Text>
         <View style={[styles.badge, { backgroundColor: me?.emailisVerified ? colors.accent : colors.surfaceAlt }]}>
-          <Text style={styles.badgeText}>{me?.emailisVerified ? '✓ Email verified' : '✗ Email not verified'}</Text>
+          <Ionicons name={me?.emailisVerified ? 'checkmark-circle' : 'close-circle'} size={12} color={colors.textPrimary} />
+          <Text style={styles.badgeText}>{me?.emailisVerified ? ' Email verified' : ' Email not verified'}</Text>
         </View>
       </View>
 
@@ -100,7 +102,7 @@ export default function SettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   card: { backgroundColor: colors.surface, borderRadius: 8, padding: spacing.md, marginVertical: spacing.md },
-  badge: { alignSelf: 'flex-start', marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
+  badge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
   badgeText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' },
   section: { marginTop: spacing.lg, marginBottom: spacing.sm },
   input: { backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 8, padding: spacing.md, marginBottom: spacing.sm, fontSize: 14 },
