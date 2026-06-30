@@ -42,7 +42,7 @@ function Navigation() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }}/>
+          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerTransparent: true, headerTitle: '' }}/>
           <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} /> 
         </>
       ) : (
