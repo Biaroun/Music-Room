@@ -13,7 +13,8 @@ const SHORTCUTS: Shortcut[] = [
   { title: 'Playlist Editor', icon: 'musical-notes', screen: 'PlaylistEditor', color: '#1DB954' },
   { title: 'My Profile', icon: 'person', screen: 'Profile', color: '#8b5cf6' },
   { title: 'Settings', icon: 'settings', screen: 'Settings', color: '#3b82f6' },
-  { title: 'Track Vote', icon: 'bar-chart', color: '#e8115b', soon: true },
+  { title: 'Track Vote', icon: 'bar-chart', screen: 'TrackVote', color: '#e8115b' },
+  { title: 'Music Delegation', icon: 'git-network', screen: 'MusicDelegation', color: '#f59e0b' },
   { title: 'Friend', icon: 'people', screen: 'Friends', color: '#1DB954' },
 ];
 

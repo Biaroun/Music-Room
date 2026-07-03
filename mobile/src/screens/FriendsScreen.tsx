@@ -1,21 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, TextInput, Modal, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, TouchableOpacity, ActivityIndicator, TextInput, Modal, Alert, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import {
-    Canvas,
-    Fill,
-    Shader,
-    Skia,
-    useClock,
-    Line,
-    vec,
-    LinearGradient as SkiaLinearGradient,
-    DashPathEffect,
-} from '@shopify/react-native-skia';
 import Animated, {
     useSharedValue,
-    useDerivedValue,
     useAnimatedStyle,
     withRepeat,
     withSequence,
@@ -27,15 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
 import { getAvatar } from '../config/avatars';
+import PoolBackground from './PoolBackground';
 
-const { width: W, height: H } = Dimensions.get('window');
 const ME_SZ = 82;
 const FR_SZ = 58;
 const OT_SZ = 44;
 const GREEN = '#1DB954';
-const VMIN = Math.min(W, H);
-const CX = W / 2;
-const CY = H / 2;
 const COLORS = ['#e91e63',
                 '#8b5cf6',
                 '#f97316',
@@ -46,7 +31,7 @@ const COLORS = ['#e91e63',
                 '#06b6d4'];
 const GREY = ['#4b5563', '#78716c', '#52525b', '#475569', '#57534e'];
 
-type Person = {
+export type Person = {
     key: string;
     relId: number | null;   // friendship id (amis uniquement)
     userId: number;
@@ -64,9 +49,9 @@ type SearchResult = {
     avatar?: string | null;
 };
 
-function toXY(ang: number, dst: number) {
+function toXY(ang: number, dst: number, vmin: number) {
     const rad = (ang * Math.PI) / 180;
-    const d = (dst / 100) * VMIN;
+    const d = (dst / 100) * vmin;
     return { x: Math.cos(rad) * d, y: Math.sin(rad) * d };
 }
 
@@ -80,112 +65,9 @@ function floatOffsets(id: number) {
     ];
 }
 
-const POOL_SHADER = `
-uniform float2 u_resolution;
-uniform float u_time;
-
-half4 main(float2 fragCoord) {
-    float2 center = u_resolution * 0.5;
-    float vm = min(u_resolution.x, u_resolution.y);
-    float t = u_time;
-
-    // Degrade radial profond (deep pool)
-    float dist = distance(fragCoord, float2(center.x, center.y * 0.88))
-                 / (max(u_resolution.x, u_resolution.y) * 0.95);
-    dist = clamp(dist, 0.0, 1.0);
-    float3 c1 = float3(0.063, 0.180, 0.322); // #102e52
-    float3 c2 = float3(0.031, 0.118, 0.220); // #081e38
-    float3 c3 = float3(0.012, 0.051, 0.114); // #030d1d
-    float3 col = dist < 0.5 ? mix(c1, c2, dist / 0.5) : mix(c2, c3, (dist - 0.5) / 0.5);
-
-    // Grille de carrelage qui derive lentement
-    float ts = vm * 0.09;
-    float2 g = abs(fract((fragCoord + float2(t * 0.38, t * 0.22)) / ts) - 0.5);
-    float line = smoothstep(0.0, 0.03, min(g.x, g.y));
-    col += float3(0.117, 0.333, 0.627) * (1.0 - line) * 0.05;
-
-    for (int i = 0; i < 22; i++) {
-        float fi = float(i);
-        float ph = (fi / 22.0) * 6.2831853;
-        float orb = vm * (0.15 + 0.27 * abs(sin(fi * 0.78)));
-        float bx = center.x + cos(ph + t * 0.065) * orb + sin(t * 0.11 + fi * 1.5) * vm * 0.042;
-        float by = center.y + sin(ph + t * 0.048) * orb * 0.73 + cos(t * 0.08 + fi * 1.9) * vm * 0.036;
-        float bs = vm * (0.037 + 0.022 * sin(t * 0.28 + fi));
-        float al = 0.036 + 0.023 * sin(t * 0.5 + fi * 0.65);
-        float fall = max(0.0, 1.0 - distance(fragCoord, float2(bx, by)) / bs);
-        col += float3(0.41, 0.84, 1.0) * fall * fall * al * 2.8;
-    }
-
-    // etincelles brillantes
-    for (int i = 0; i < 8; i++) {
-        float fi = float(i);
-        float ph = (fi / 8.0) * 6.2831853;
-        float r = vm * (0.06 + 0.13 * sin(fi * 0.85 + t * 0.09));
-        float hx = center.x + cos(ph + t * 0.13) * r;
-        float hy = center.y + sin(ph + t * 0.1) * r * 0.78;
-        float hs = vm * (0.017 + 0.012 * sin(t * 0.38 + fi));
-        float ha = 0.09 + 0.055 * sin(t * 0.55 + fi * 0.75);
-        float fall = max(0.0, 1.0 - distance(fragCoord, float2(hx, hy)) / hs);
-        col += float3(0.92, 0.99, 1.0) * fall * fall * ha * 3.2;
-    }
-
-    // Vignette     
-    float vd = distance(fragCoord, center) / (max(u_resolution.x, u_resolution.y) * 0.75);
-    vd = clamp((vd - 0.4) / 0.6, 0.0, 1.0);
-    col = mix(col, float3(0.004, 0.020, 0.055), vd * 0.7);
-
-    return half4(col, 1.0);
-}
-`;
-
-function PoolBackground({ friends }: { friends: Person[] }) {
-    const clock = useClock();
-    const effect = useMemo(() => Skia.RuntimeEffect.Make(POOL_SHADER), []);
-
-    const uniforms = useDerivedValue(() => ({
-        u_resolution: [W, H],
-        u_time: clock.value / 1000,
-    }));
-
-    const phase = useDerivedValue(() => -(clock.value / 1000) * 15);
-
-    if (!effect) {
-        return null;
-    }
-
-    return (
-        <Canvas style={StyleSheet.absoluteFill}>
-            <Fill>
-                <Shader source={effect} uniforms={uniforms} />
-            </Fill>
-
-            {friends.map(p => {
-                const { x, y } = toXY(p.ang, p.dst);
-                return (
-                    <Line
-                        key={p.key}
-                        p1={vec(CX, CY)}
-                        p2={vec(CX + x, CY + y)}
-                        style="stroke"
-                        strokeWidth={1}
-                    >
-                        <SkiaLinearGradient
-                            start={vec(CX, CY)}
-                            end={vec(CX + x, CY + y)}
-                            colors={['rgba(29,185,84,0.55)', 'rgba(29,185,84,0.12)', 'rgba(29,185,84,0.02)']}
-                            positions={[0, 0.6, 1]}
-                        />
-                        <DashPathEffect intervals={[3, 8]} phase={phase} />
-                    </Line>
-                );
-            })}
-        </Canvas>
-    );
-}
-
-function UserBubble({ p, isSelected, onPress }: { p: Person; isSelected: boolean; onPress: () => void }) {
+function UserBubble({ p, isSelected, onPress, vmin }: { p: Person; isSelected: boolean; onPress: () => void; vmin: number }) {
     const sz = p.isFriend ? FR_SZ : OT_SZ;
-    const { x, y } = toXY(p.ang, p.dst);
+    const { x, y } = toXY(p.ang, p.dst, vmin);
     const ini = p.username.slice(0, 2).toUpperCase();
     const avatar = getAvatar(p.avatar);
 
@@ -291,7 +173,7 @@ function UserBubble({ p, isSelected, onPress }: { p: Person; isSelected: boolean
                     circleStyle,
                 ]}>
                     {avatar ? (
-                        <Image source={avatar.source} style={[StyleSheet.absoluteFill, { borderRadius: sz / 2 }]} />
+                        <Image source={avatar.source} style={{ width: '100%', height: '100%', borderRadius: sz / 2 }} />
                     ) : (
                         <>
                             <LinearGradient
@@ -368,7 +250,7 @@ function MeBubble({ avatarId }: { avatarId: string | null }) {
 
             <Animated.View style={[styles.meCircle, breathStyle]}>
                 {avatar ? (
-                    <Image source={avatar.source} style={[StyleSheet.absoluteFill, { borderRadius: ME_SZ / 2 }]} />
+                    <Image source={avatar.source} style={{ width: '100%', height: '100%', borderRadius: ME_SZ / 2 }} />
                 ) : (
                     <>
                         <LinearGradient
@@ -389,6 +271,10 @@ function MeBubble({ avatarId }: { avatarId: string | null }) {
 
 export default function FriendsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
+    const { width: W, height: H } = useWindowDimensions();
+    const vmin = Math.min(W, H);
+    const cx = W / 2;
+    const cy = H / 2;
     const { token } = useAuth();
     const [friends, setFriends] = useState<Person[]>([]);
     const [others, setOthers] = useState<Person[]>([]);
@@ -433,7 +319,9 @@ export default function FriendsScreen({ navigation }: any) {
                 isFriend: false,
             }));
             setOthers(mappedOthers);
-        } catch {}
+        } catch (e: any) {
+            console.warn('chargement des amis KO:', e?.message ?? e);
+        }
         finally { setLoading(false); }
     }, [token]);
 
@@ -487,7 +375,7 @@ export default function FriendsScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
-            <PoolBackground friends={friends} />
+            <PoolBackground friends={friends} width={W} height={H} vmin={vmin} cx={cx} cy={cy} />
 
             <View style={[styles.header, { top: insets.top + 16 }]}>
                 <View style={styles.headerLeft}>
@@ -513,6 +401,7 @@ export default function FriendsScreen({ navigation }: any) {
                     <UserBubble
                         key={p.key}
                         p={p}
+                        vmin={vmin}
                         isSelected={selKey === p.key}
                         onPress={() => setSelKey(prev => prev === p.key ? null : p.key)}
                     />
@@ -531,7 +420,7 @@ export default function FriendsScreen({ navigation }: any) {
                     <View style={styles.cardTop}>
                         <View style={styles.cardAvatar}>
                             {getAvatar(selected.avatar) ? (
-                                <Image source={getAvatar(selected.avatar)!.source} style={[StyleSheet.absoluteFill, { borderRadius: 23 }]} />
+                                <Image source={getAvatar(selected.avatar)!.source} style={{ width: '100%', height: '100%', borderRadius: 23 }} />
                             ) : (
                                 <>
                                     <LinearGradient
@@ -755,6 +644,8 @@ const styles = StyleSheet.create({
     },
     bubble: {
         position: 'absolute',
+        top: 0,
+        left: 0,
         alignItems: 'center',
         justifyContent: 'center',
     },
