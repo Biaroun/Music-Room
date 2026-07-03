@@ -1,6 +1,5 @@
 env:
-	@test -f backend/.env || cp backend/.env.exemple backend/.env
-	@echo "✅ backend/.env prêt (édite les valeurs MAIL_* et secrets)"
+	@./scripts/setup-env.sh
 
 install: env
 	cd backend && npm install

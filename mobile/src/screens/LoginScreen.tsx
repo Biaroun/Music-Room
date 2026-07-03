@@ -55,6 +55,10 @@ export default function LoginScreen({ navigation }: any) {
         <Text style={styles.buttonText}>{loading ? 'Loading...' : 'Login'}</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.forgotLink} onPress={() => navigation.navigate('ForgotPassword')}>
+        <Text style={[typography.caption, { color: colors.accent }]}>Forgot password?</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Register')}>
         <Text style={typography.caption}>No account? <Text style={{ color: colors.accent }}>Register</Text></Text>
       </TouchableOpacity>
@@ -91,6 +95,9 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: '700',
     fontSize: 16,
+  },
+  forgotLink: {
+    marginTop: spacing.md,
   },
   link: {
     marginTop: spacing.lg,

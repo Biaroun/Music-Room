@@ -4,6 +4,27 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { LogsInterceptor } from './logs/logs.interceptor';
 import { AllExceptionsFilter } from './logs/all-exceptions.filter';
+import { createServer } from 'net';
+
+// si le port est déjà pris, on prend le suivant (pratique quand j'ai déjà un truc sur 3000)
+function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const tryPort = (port: number, attemptsLeft: number) => {
+      const tester = createServer();
+      tester.once('error', (err: NodeJS.ErrnoException) => {
+        tester.close();
+        if (err.code === 'EADDRINUSE' && attemptsLeft > 0) {
+          tryPort(port + 1, attemptsLeft - 1);
+        } else {
+          reject(err);
+        }
+      });
+      tester.once('listening', () => tester.close(() => resolve(port)));
+      tester.listen(port, '0.0.0.0');
+    };
+    tryPort(startPort, maxAttempts);
+  });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,11 +50,14 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
-  console.log(`🎵 Music Room API running on port ${process.env.PORT ?? 3000}`);
-  console.log(
-      `📖 Swagger available at http://localhost:${process.env.PORT ?? 3000}/api/docs`,
-  );
+  const desiredPort = Number(process.env.PORT) || 3000;
+  const port = await findAvailablePort(desiredPort);
+  if (port !== desiredPort) {
+    console.warn(`⚠️  Port ${desiredPort} déjà utilisé, bascule sur le port ${port}`);
+  }
 
+  await app.listen(port, '0.0.0.0');
+  console.log(`🎵 Music Room API running on port ${port}`);
+  console.log(`📖 Swagger available at http://localhost:${port}/api/docs`);
 }
 bootstrap();

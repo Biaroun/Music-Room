@@ -8,12 +8,15 @@ import { ToastProvider } from './src/components/Toast';
 
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import PlaylistEditorScreen from './src/screens/PlaylistEditorScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
+import TrackVoteScreen from './src/screens/TrackVoteScreen';
+import MusicDelegationScreen from './src/screens/MusicDelegationScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -42,13 +45,16 @@ function Navigation() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerTransparent: true, headerTitle: '' }}/>
-          <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} /> 
+          <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }}/>
+          <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} />
+          <Stack.Screen name="TrackVote" component={TrackVoteScreen} options={{ title: 'Track Vote' }} />
+          <Stack.Screen name="MusicDelegation" component={MusicDelegationScreen} options={{ title: 'Music Delegation' }} />
         </>
       ) : (
         <>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Mot de passe oublié' }} />
         </>
       )}
     </Stack.Navigator>
