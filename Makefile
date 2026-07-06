@@ -1,4 +1,8 @@
-install:
+env:
+	@test -f backend/.env || cp backend/.env.exemple backend/.env
+	@echo "✅ backend/.env prêt (édite les valeurs MAIL_* et secrets)"
+
+install: env
 	cd backend && npm install
 	cd mobile && npm install
 
@@ -20,6 +24,9 @@ dev-back:
 
 dev-mobile:
 	cd mobile && npx expo start
+
+dev-web:
+	cd mobile && npx expo start --web
 
 docker-up:
 	docker compose up -d
