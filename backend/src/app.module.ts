@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
+import { createKeyv } from '@keyv/redis';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TrackVoteModule } from './track-vote/track-vote.module';
@@ -31,8 +32,7 @@ import { FriendshipModule } from './friendship/friendship.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        store: 'ioredis',
-        url: config.get<string>('REDIS_URL'),
+        stores: [createKeyv(config.get<string>('REDIS_URL'))],
       }),
     }),
     AuthModule,
