@@ -1,0 +1,122 @@
+### ===== USER PROFILE PUBLIC TESTS =====
+### Exécute dans l'ordre, un clic ▶ à la fois
+
+### ===== LOGINS =====
+
+### Login testuser01
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser01",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token1", response.body.access_token);
+%}
+
+### Login testuser02
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser02",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token2", response.body.access_token);
+%}
+
+
+### ===== RÉCUPÉRER LES IDS =====
+
+### Get id de testuser01
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+
+> {%
+    client.global.set("id1", response.body.id);
+%}
+
+### Get id de testuser02
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token2}}
+
+> {%
+    client.global.set("id2", response.body.id);
+%}
+
+
+### ===== SETUP PROFIL =====
+
+### User01 met bio en private et musicpreferences en friends-only
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+Content-Type: application/json
+
+{
+  "visibilitySettings": {
+    "bio": "private",
+    "musicPreferences": "friends-only"
+  }
+}
+
+### User01 ajoute une bio et des préférences musicales
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+Content-Type: application/json
+
+{
+  "bio": "Hello je suis testuser01",
+  "musicpreferences": ["rap", "rock"]
+}
+
+
+### ===== TEST VISIBILITÉ SANS AMITIÉ =====
+
+### User02 voit le profil de User01 (pas amis)
+### -> bio=null (private), musicpreferences=null (friends-only)
+GET http://localhost:3000/users/{{id1}}
+Authorization: Bearer {{token2}}
+
+
+### ===== VÉRIFIER SON PROPRE PROFIL =====
+
+### User01 voit son propre profil via /me -> tout visible
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+
+
+### ===== DEVENIR AMIS =====
+
+### User01 envoie une demande à User02
+POST http://localhost:3000/friendship/request/{{id2}}
+Authorization: Bearer {{token1}}
+
+> {%
+    client.global.set("friendshipId", response.body.id);
+%}
+
+### User02 accepte la demande
+PATCH http://localhost:3000/friendship/{{friendshipId}}/accept
+Authorization: Bearer {{token2}}
+
+
+### ===== TEST VISIBILITÉ AVEC AMITIÉ =====
+
+### User02 voit le profil de User01 (amis maintenant)
+### -> bio=null (toujours private), musicpreferences visible (friends-only + amis)
+GET http://localhost:3000/users/{{id1}}
+Authorization: Bearer {{token2}}
+
+
+### ===== SÉCURITÉ =====
+
+### Sans token -> should 401
+GET http://localhost:3000/users/{{id1}}
+
+### User inexistant -> should 404
+GET http://localhost:3000/users/99999
+Authorization: Bearer {{token1}}
