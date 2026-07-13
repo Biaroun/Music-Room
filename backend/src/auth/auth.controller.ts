@@ -1,4 +1,4 @@
-import {Controller, Post, Body, Get, Query, BadRequestException} from '@nestjs/common';
+import {Controller, Post, Body, Get, Query, BadRequestException, UseGuards, Headers as NestHeaders} from '@nestjs/common';
 import {RegisterDto} from "./dto/register.dto";
 import {AuthService} from "./auth.service";
 import {ApiTags, ApiOperation, ApiResponse, ApiQuery} from '@nestjs/swagger';
@@ -7,6 +7,7 @@ import {MailService} from "../mail/mail.service";
 import {UsersService} from "../users/users.service";
 import { Res } from '@nestjs/common';
 import type { Response } from 'express';
+import {JwtAuthGuard} from "./guards/jwt-auth.guard";
 
 @ApiTags('auth')
 @Controller('auth')
@@ -28,6 +29,16 @@ export class AuthController {
     @Post('login')
     async login(@Body() dto: LoginDto){
         return await this.authService.login(dto);
+    }
+
+    @ApiOperation({ summary: 'Logout' })
+    @ApiResponse({ status: 200, description: 'Logged out successfully' })
+    @UseGuards(JwtAuthGuard)
+    @Post('logout')
+    async logout(@NestHeaders('authorization') auth: string) {
+        const token = auth.split(' ')[1];
+        await this.authService.logout(token);
+        return { message: 'Logged out successfully' };
     }
 
     @ApiOperation({ summary: 'Verify email' })
