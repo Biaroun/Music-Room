@@ -21,6 +21,7 @@
     "start:all": "concurrently --names \"BACK,MOBILE\" --prefix-colors \"green,cyan\" \"npm run start:dev\" \"cd ../mobile && npx expo start --android\""
   },
   "dependencies": {
+    "@keyv/redis": "^5.1.6",
     "@nestjs/cache-manager": "^3.1.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",

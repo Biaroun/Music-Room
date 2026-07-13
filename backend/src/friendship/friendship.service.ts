@@ -30,6 +30,7 @@ export class FriendshipService {
             ],
         });
         return !!relation;
+    }
     async isRelationExist(userAId: number, userBId: number, status: FriendshipStatus): Promise<Friendship | null> {
         return await this.friendshipRepository.findOne({
             where: [
