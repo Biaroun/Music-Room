@@ -1,15 +1,18 @@
-import {Body, Controller, Get, NotFoundException, Patch, Req, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, NotFoundException, Param, Patch, Req, UseGuards} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {ApiOperation, ApiResponse} from "@nestjs/swagger";
+import {ApiOperation, ApiResponse, ApiParam} from "@nestjs/swagger";
 import {CurrentUser} from "../auth/decorators/current-user.decorator";
 import { UsersService } from './users.service';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
 import {UpdateEmailDto} from "./dto/update-email.dto";
 import {UpdatePasswordDto} from "./dto/update-password.dto";
+import {FriendshipService} from "../friendship/friendship.service";
+import {Visibility} from "./user.entity";
 
 @Controller('users')
 export class UsersController {
-    constructor(private usersService: UsersService) {}
+    constructor(private usersService: UsersService,
+                private friendshipService: FriendshipService) {}
 
 
     @ApiOperation({ summary: 'info about me' })
@@ -81,5 +84,37 @@ export class UsersController {
         }
 
         return { message: 'Password updated successfully' };
+    }
+
+    @ApiOperation({ summary: 'Get user profile by id' })
+    @ApiParam({ name: 'id', description: 'Id of the user to get' })
+    @ApiResponse({ status: 200, description: 'User profile' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    @UseGuards(JwtAuthGuard)
+    @Get(':id')
+    async getUserProfile(@CurrentUser() user: { id: number }, @Param('id') id: string) {
+        const targetUser = await this.usersService.findById(parseInt(id));
+
+        if (!targetUser) {
+            throw new NotFoundException('User not found');
+        }
+        const friends = await this.friendshipService.areFriends(user.id, parseInt(id));
+
+        const visibility = targetUser.visibilitySettings;
+        const defaultVis = Visibility.PUBLIC; // si null
+
+        const isFieldVisible = (fieldVisibility: Visibility | undefined) => {
+            const vis = fieldVisibility ?? defaultVis;
+            if (vis === Visibility.PUBLIC) return true;
+            if (vis === Visibility.FRIENDS_ONLY) return friends;
+            return false; // PRIVATE
+        };
+
+        return {
+            id: targetUser.id,
+            username: targetUser.username,
+            bio: isFieldVisible(visibility?.bio) ? targetUser.bio : null,
+            musicpreferences: isFieldVisible(visibility?.musicPreferences) ? targetUser.musicpreferences : null,
+        };
     }
 }

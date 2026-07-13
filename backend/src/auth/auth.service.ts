@@ -1,6 +1,6 @@
 import {ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { User } from '../users/user.entity';
+import { Visibility } from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
 import {JwtService} from "@nestjs/jwt";
@@ -25,6 +25,11 @@ export class AuthService {
     const user = await this.usersService.create({
       ...userData,
       password: hashedPassword,
+      visibilitySettings: {
+        username: Visibility.PUBLIC,
+        bio: Visibility.PUBLIC,
+        musicPreferences: Visibility.PUBLIC,
+      },
     });
 
     const tokenverif = await this.usersService.generateEmailVerificationToken(user.id);

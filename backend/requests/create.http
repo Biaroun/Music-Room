@@ -1,0 +1,194 @@
+### ===== CREATE TEST ACCOUNTS =====
+
+### Register testuser01
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser01",
+  "email": "testuser01@test.com",
+  "password": "Test1234!@#$",
+  "passwordConfirm": "Test1234!@#$"
+}
+
+### Register testuser02
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser02",
+  "email": "testuser02@test.com",
+  "password": "Test1234!@#$",
+  "passwordConfirm": "Test1234!@#$"
+}
+
+### Register testuser03
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser03",
+  "email": "testuser03@test.com",
+  "password": "Test1234!@#$",
+  "passwordConfirm": "Test1234!@#$"
+}
+
+### Register testuser04
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser04",
+  "email": "testuser04@test.com",
+  "password": "Test1234!@#$",
+  "passwordConfirm": "Test1234!@#$"
+}
+
+
+### ===== LOGINS =====
+
+### Login testuser01
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser01",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token1", response.body.access_token);
+%}
+
+### Login testuser02
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser02",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token2", response.body.access_token);
+%}
+
+### Login testuser03
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser03",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token3", response.body.access_token);
+%}
+
+### Login testuser04
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "login": "testuser04",
+  "password": "Test1234!@#$"
+}
+
+> {%
+    client.global.set("token4", response.body.access_token);
+%}
+
+
+### ===== SETUP PROFILS =====
+
+### testuser01 - bio public, musicpref friends-only
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+Content-Type: application/json
+
+{
+  "bio": "Fan de rap et de rock, organisateur de soirées musicales",
+  "musicpreferences": ["rap", "rock", "electro"],
+  "visibilitySettings": {
+    "bio": "public",
+    "musicPreferences": "friends-only"
+  }
+}
+
+### testuser02 - tout private
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token2}}
+Content-Type: application/json
+
+{
+  "bio": "Bio secrète de testuser02",
+  "musicpreferences": ["jazz", "classical"],
+  "visibilitySettings": {
+    "bio": "private",
+    "musicPreferences": "private"
+  }
+}
+
+### testuser03 - tout public
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token3}}
+Content-Type: application/json
+
+{
+  "bio": "Bio publique de testuser03",
+  "musicpreferences": ["reggae", "rnb"],
+  "visibilitySettings": {
+    "bio": "public",
+    "musicPreferences": "public"
+  }
+}
+
+### testuser04 - tout friends-only
+PATCH http://localhost:3000/users/me
+Authorization: Bearer {{token4}}
+Content-Type: application/json
+
+{
+  "bio": "Bio réservée aux amis de testuser04",
+  "musicpreferences": ["metal", "country"],
+  "visibilitySettings": {
+    "bio": "friends-only",
+    "musicPreferences": "friends-only"
+  }
+}
+
+
+### ===== VÉRIFICATION IDS =====
+
+### Get id testuser01
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token1}}
+
+> {%
+    client.global.set("id1", response.body.id);
+%}
+
+### Get id testuser02
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token2}}
+
+> {%
+    client.global.set("id2", response.body.id);
+%}
+
+### Get id testuser03
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token3}}
+
+> {%
+    client.global.set("id3", response.body.id);
+%}
+
+### Get id testuser04
+GET http://localhost:3000/users/me
+Authorization: Bearer {{token4}}
+
+> {%
+    client.global.set("id4", response.body.id);
+%}
