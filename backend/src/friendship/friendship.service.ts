@@ -1,4 +1,4 @@
-import {ConflictException, Injectable, NotFoundException} from '@nestjs/common';
+import {ConflictException, ForbiddenException, Injectable, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import {Friendship, FriendshipStatus} from "./friendship.entity";
@@ -30,17 +30,34 @@ export class FriendshipService {
             ],
         });
         return !!relation;
+    async isRelationExist(userAId: number, userBId: number, status: FriendshipStatus): Promise<Friendship | null> {
+        return await this.friendshipRepository.findOne({
+            where: [
+                { requester: { id: userAId }, receiver: { id: userBId }, status : status },
+                { requester: { id: userBId }, receiver: { id: userAId }, status : status  },
+            ],
+            relations: ['requester', 'receiver'],
+        });
     }
 
     async sendRequest(requesterId: number, receiverId: number): Promise<Friendship> {
+
         let relation = await this.isFriendshipExist(requesterId, receiverId);
 
-        if (relation && requesterId !== relation.receiver.id) {
-            throw new ConflictException('Friend request already sent');
-        }
-
         if (relation) {
-            relation.status = FriendshipStatus.ACCEPTED;
+            if (relation.status === FriendshipStatus.BLOCKED)
+                throw new ForbiddenException('A block exists between you and this user');
+
+            if (relation.status === FriendshipStatus.ACCEPTED) {
+                throw new ConflictException('You are already friends');
+            }
+
+            if (relation.status === FriendshipStatus.PENDING ) {
+                if (requesterId !== relation.receiver.id)
+                    throw new ConflictException('Friend request already sent');
+                else
+                    relation.status = FriendshipStatus.ACCEPTED;
+            }
         } else {
             relation = this.friendshipRepository.create({
                 requester: { id: requesterId } as User,
@@ -64,28 +81,29 @@ export class FriendshipService {
 
     async acceptRequest(requestId: number, receiverId: number): Promise<Friendship> {
         const relation = await this.friendshipRepository.findOne({
-            where: { id: requestId, receiver: { id: receiverId } },
+            where: { id: requestId, receiver: { id: receiverId }, status: FriendshipStatus.PENDING },
             relations: ['requester', 'receiver'],
         });
 
         if (!relation) {
             throw new NotFoundException('Request didnt exist');
         }
-
         relation.status = FriendshipStatus.ACCEPTED;
         return await this.friendshipRepository.save(relation);
+
     }
 
     async rejectRequest(requestId: number, receiverId: number): Promise<void> {
         const relation = await this.friendshipRepository.findOne({
-            where: { id: requestId, receiver: { id: receiverId } }
+            where: { id: requestId, receiver: { id: receiverId }, status: FriendshipStatus.PENDING },
+            relations: ['requester', 'receiver'],
         });
 
         if (!relation) {
             throw new NotFoundException('Request didnt exist');
         }
-
         await this.friendshipRepository.delete(relation.id);
+        return;
     }
 
     async getPendingRequests(receiverId: number): Promise<Friendship[]> {
