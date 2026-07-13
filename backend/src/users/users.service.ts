@@ -31,8 +31,24 @@ export class UsersService {
   }
 
   async findById(id: number): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { id },
-      select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true }});
+    return await this.userRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        password: true,
+        emailisVerified: true,
+        oAuthProvider: true,
+        bio: true,
+        musicpreferences: true,
+        visibilitySettings: true,
+        emailVerificationToken: true,
+        emailVerificationExpires: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
   }
 
   async create(data: Partial<User>): Promise<User> {
