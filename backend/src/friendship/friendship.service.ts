@@ -22,6 +22,14 @@ export class FriendshipService {
         });
     }
 
+    async areFriends(userAId: number, userBId: number): Promise<boolean> {
+        const relation = await this.friendshipRepository.findOne({
+            where: [
+                { requester: { id: userAId }, receiver: { id: userBId }, status: FriendshipStatus.ACCEPTED },
+                { requester: { id: userBId }, receiver: { id: userAId }, status: FriendshipStatus.ACCEPTED },
+            ],
+        });
+        return !!relation;
     async isRelationExist(userAId: number, userBId: number, status: FriendshipStatus): Promise<Friendship | null> {
         return await this.friendshipRepository.findOne({
             where: [
