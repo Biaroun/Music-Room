@@ -38,15 +38,6 @@ export class UpdateProfileDto {
     bio?: string;
 
     @ApiProperty({
-        example: 'avatar-3',
-        description: 'Id of the chosen predefined avatar',
-    })
-    @IsString()
-    @MaxLength(64)
-    @IsOptional()
-    avatar?: string;
-
-    @ApiProperty({
         example: ['rap', 'rock'],
         enum: MusicGenre,
         isArray: true,

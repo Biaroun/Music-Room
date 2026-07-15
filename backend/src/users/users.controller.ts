@@ -1,24 +1,19 @@
-import {Body, Controller, Get, NotFoundException, Patch, Query, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, NotFoundException, Param, Patch, Req, UseGuards} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {ApiOperation, ApiResponse} from "@nestjs/swagger";
+import {ApiOperation, ApiResponse, ApiParam} from "@nestjs/swagger";
 import {CurrentUser} from "../auth/decorators/current-user.decorator";
 import { UsersService } from './users.service';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
 import {UpdateEmailDto} from "./dto/update-email.dto";
 import {UpdatePasswordDto} from "./dto/update-password.dto";
+import {FriendshipService} from "../friendship/friendship.service";
+import {Visibility} from "./user.entity";
 
 @Controller('users')
 export class UsersController {
-    constructor(private usersService: UsersService) {}
+    constructor(private usersService: UsersService,
+                private friendshipService: FriendshipService) {}
 
-
-    @ApiOperation({ summary: 'Search or list users by username' })
-    @UseGuards(JwtAuthGuard)
-    @Get('search')
-    async searchUsers(@Query('q') query: string, @CurrentUser() user: { id: number }) {
-        const users = await this.usersService.searchByUsername(query ?? '', user.id);
-        return users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar }));
-    }
 
     @ApiOperation({ summary: 'info about me' })
     @UseGuards(JwtAuthGuard)
@@ -37,7 +32,6 @@ export class UsersController {
             emailisVerified: fulluser.emailisVerified,
             musicpreferences: fulluser.musicpreferences,
             bio: fulluser.bio,
-            avatar: fulluser.avatar,
             visibilitySettings: fulluser.visibilitySettings,
             oAuthProvider: fulluser.oAuthProvider,
             createdAt: fulluser.createdAt,
@@ -59,7 +53,6 @@ export class UsersController {
             id: updatedUser.id,
             username: updatedUser.username,
             bio: updatedUser.bio,
-            avatar: updatedUser.avatar,
             musicpreferences: updatedUser.musicpreferences,
             visibilitySettings: updatedUser.visibilitySettings,
         };
@@ -91,5 +84,37 @@ export class UsersController {
         }
 
         return { message: 'Password updated successfully' };
+    }
+
+    @ApiOperation({ summary: 'Get user profile by id' })
+    @ApiParam({ name: 'id', description: 'Id of the user to get' })
+    @ApiResponse({ status: 200, description: 'User profile' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    @UseGuards(JwtAuthGuard)
+    @Get(':id')
+    async getUserProfile(@CurrentUser() user: { id: number }, @Param('id') id: string) {
+        const targetUser = await this.usersService.findById(parseInt(id));
+
+        if (!targetUser) {
+            throw new NotFoundException('User not found');
+        }
+        const friends = await this.friendshipService.areFriends(user.id, parseInt(id));
+
+        const visibility = targetUser.visibilitySettings;
+        const defaultVis = Visibility.PUBLIC; // si null
+
+        const isFieldVisible = (fieldVisibility: Visibility | undefined) => {
+            const vis = fieldVisibility ?? defaultVis;
+            if (vis === Visibility.PUBLIC) return true;
+            if (vis === Visibility.FRIENDS_ONLY) return friends;
+            return false; // PRIVATE
+        };
+
+        return {
+            id: targetUser.id,
+            username: targetUser.username,
+            bio: isFieldVisible(visibility?.bio) ? targetUser.bio : null,
+            musicpreferences: isFieldVisible(visibility?.musicPreferences) ? targetUser.musicpreferences : null,
+        };
     }
 }

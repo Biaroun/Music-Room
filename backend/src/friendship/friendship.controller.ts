@@ -87,7 +87,6 @@ export class FriendshipController {
             id: request.id,
             from: request.requester.username,
             fromId: request.requester.id,
-            avatar: request.requester.avatar,
             createdAt: request.createdAt,
         }));
     }
@@ -104,7 +103,6 @@ export class FriendshipController {
                 id: relation.id,
                 friendId: friend.id,
                 username: friend.username,
-                avatar: friend.avatar,
             };
         });
     }
