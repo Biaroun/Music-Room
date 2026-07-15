@@ -31,9 +31,24 @@ export class UsersService {
   }
 
   async findById(id: number): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { id },
-      select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true,
-        avatar: true, bio: true, musicpreferences: true, visibilitySettings: true, createdAt: true, updatedAt: true }});
+    return await this.userRepository.findOne({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        password: true,
+        emailisVerified: true,
+        oAuthProvider: true,
+        bio: true,
+        musicpreferences: true,
+        visibilitySettings: true,
+        emailVerificationToken: true,
+        emailVerificationExpires: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    });
   }
 
   async create(data: Partial<User>): Promise<User> {
@@ -80,21 +95,6 @@ export class UsersService {
     return true;
   }
 
-  async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
-    const qb = this.userRepository
-      .createQueryBuilder('user')
-      .where('user.id != :excludeId', { excludeId: excludeUserId })
-      .select(['user.id', 'user.username', 'user.avatar'])
-      .orderBy('user.username', 'ASC')
-      .limit(50);
-
-    if (query) {
-      qb.andWhere('LOWER(user.username) LIKE :q', { q: `%${query.toLowerCase()}%` });
-    }
-
-    return qb.getMany();
-  }
-
   async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user) {
@@ -102,9 +102,6 @@ export class UsersService {
     }
     if (data.bio) {
       user.bio = data.bio;
-    }
-    if (data.avatar !== undefined) {
-      user.avatar = data.avatar;
     }
     if (data.musicpreferences) {
       user.musicpreferences = [...new Set(data.musicpreferences)];

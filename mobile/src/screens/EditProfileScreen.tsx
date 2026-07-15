@@ -31,12 +31,13 @@ export default function EditProfileScreen({ navigation }: any) {
   const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch('/users/me', token)
-      .then((me) => {
+    // le back ne persiste plus `avatar` (colonne retirée) : source de vérité locale.
+    Promise.all([apiFetch('/users/me', token), storage.getItem('profile_avatar')])
+      .then(([me, storedAvatar]) => {
         setBio(me.bio ?? '');
         setGenres(me.musicpreferences ?? []);
         setVisibility((v) => ({ ...v, ...(me.visibilitySettings ?? {}) }));
-        setAvatar(me.avatar ?? null);
+        setAvatar(storedAvatar || null);
       })
       .catch((e: any) => Alert.alert('Error', e.message))
       .finally(() => setLoading(false));

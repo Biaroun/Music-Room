@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
 import { getAvatar } from '../config/avatars';
+import { storage } from '../config/storage';
 import PoolBackground from './PoolBackground';
 
 const ME_SZ = 82;
@@ -286,24 +287,31 @@ export default function FriendsScreen({ navigation }: any) {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [searching, setSearching] = useState(false);
+    const [searchUnavailable, setSearchUnavailable] = useState(false);
 
     const loadData = useCallback(async () => {
+        let mappedFriends: Person[] = [];
         try {
             const friendData = await apiFetch('/friendship/friends', token);
-            const mappedFriends: Person[] = friendData.map((f: any, i: number) => ({
+            mappedFriends = friendData.map((f: any, i: number) => ({
                 key: `f-${f.id}`,
                 relId: f.id,
                 userId: f.friendId,
                 username: f.username,
-                avatar: f.avatar ?? null,
+                avatar: null, // le back ne renvoie plus d'avatar sur cette route
                 color: COLORS[i % COLORS.length],
                 ang: friendData.length ? (360 / friendData.length) * i : 0,
                 dst: 22 + (i % 2) * 4,
                 isFriend: true,
             }));
             setFriends(mappedFriends);
+        } catch (e: any) {
+            console.warn('chargement des amis KO:', e?.message ?? e);
+        }
 
-            // "Inconnus" = vrais comptes qui ne sont pas encore mes amis
+        // "Inconnus" = comptes à découvrir via /users/search — endpoint retiré
+        // côté back pour l'instant, en attente que Biaroun le rétablisse.
+        try {
             const friendIds = new Set(mappedFriends.map(f => f.userId));
             const allUsers: SearchResult[] = await apiFetch('/users/search?q=', token);
             const otherUsers = allUsers.filter(u => !friendIds.has(u.id)).slice(0, 6);
@@ -312,23 +320,25 @@ export default function FriendsScreen({ navigation }: any) {
                 relId: null,
                 userId: u.id,
                 username: u.username,
-                avatar: u.avatar ?? null,
+                avatar: null,
                 color: GREY[i % GREY.length],
                 ang: (360 / Math.max(otherUsers.length, 1)) * i + 30,
                 dst: 36 + (i % 3) * 2,
                 isFriend: false,
             }));
             setOthers(mappedOthers);
-        } catch (e: any) {
-            console.warn('chargement des amis KO:', e?.message ?? e);
+        } catch {
+            setOthers([]);
         }
-        finally { setLoading(false); }
+
+        setLoading(false);
     }, [token]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
     useEffect(() => {
-        apiFetch('/users/me', token).then(me => setMyAvatar(me.avatar || null)).catch(() => {});
+        // le back ne persiste plus `avatar` (colonne retirée) : source de vérité locale.
+        storage.getItem('profile_avatar').then(a => setMyAvatar(a || null)).catch(() => {});
     }, [token]);
 
     async function searchUsers(q: string) {
@@ -337,8 +347,10 @@ export default function FriendsScreen({ navigation }: any) {
         try {
             const data = await apiFetch(`/users/search?q=${encodeURIComponent(q)}`, token);
             setSearchResults(data);
+            setSearchUnavailable(false);
         } catch {
             setSearchResults([]);
+            setSearchUnavailable(true);
         } finally {
             setSearching(false);
         }
@@ -487,7 +499,13 @@ export default function FriendsScreen({ navigation }: any) {
 
                         {searching && <ActivityIndicator color={GREEN} style={{ marginTop: 16 }} />}
 
-                        {searchResults.map(u => (
+                        {!searching && searchUnavailable && (
+                            <Text style={styles.searchUnavailableText}>
+                                Recherche indisponible pour le moment — en attente de l'API.
+                            </Text>
+                        )}
+
+                        {!searching && !searchUnavailable && searchResults.map(u => (
                             <View key={u.id} style={styles.resultRow}>
                                 <Text style={styles.resultUsername}>{u.username}</Text>
                                 <TouchableOpacity style={styles.resultButton} onPress={() => sendRequest(u.id)}>
@@ -611,6 +629,12 @@ const styles = StyleSheet.create({
         padding: 14,
         color: '#fff',
         fontSize: 14,
+    },
+    searchUnavailableText: {
+        marginTop: 16,
+        textAlign: 'center',
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.4)',
     },
     resultRow: {
         flexDirection: 'row',
