@@ -1,4 +1,4 @@
-import {ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
+import {BadRequestException, ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import {OAuthProvider, Visibility} from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
@@ -119,5 +119,23 @@ export class AuthService {
       email: payload.email!,
       username: payload.name!,
     };
+  }
+
+  async forgot_password(email: string) {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      return { message: 'If this email exists, a reset link has been sent' };
+    }
+    const token = await this.usersService.generatePasswordResetToken(user.id);
+    await this.mailService.sendPasswordResetEmail(user.email, token);
+    return { message: 'If this email exists, a reset link has been sent' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const success = await this.usersService.verifyPasswordResetToken(token, newPassword);
+    if (!success) {
+      throw new BadRequestException('Invalid or expired token');
+    }
+    return { message: 'Password reset successfully' };
   }
 }

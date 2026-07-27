@@ -95,6 +95,36 @@ export class UsersService {
     return true;
   }
 
+  async generatePasswordResetToken(userId: number){
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await this.userRepository.update(userId, {
+      passwordResetToken: token,
+      passwordResetExpires: expires,
+    });
+
+    return token;
+  }
+
+  async verifyPasswordResetToken(token: string, newpassword: string) {
+    const user = await this.userRepository.findOne({
+      where: { passwordResetToken: token }
+    });
+
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      return false;
+    }
+
+    await this.userRepository.update(user.id, {
+      password: await bcrypt.hash(newpassword, 10),
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    });
+
+    return true;
+  }
+
   async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user) {
