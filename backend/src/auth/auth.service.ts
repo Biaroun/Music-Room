@@ -1,6 +1,6 @@
 import {ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-import { Visibility } from '../users/user.entity';
+import {OAuthProvider, Visibility} from '../users/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
 import {JwtService} from "@nestjs/jwt";
@@ -9,12 +9,15 @@ import {MailService} from "../mail/mail.service";
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Inject } from '@nestjs/common';
+import { OAuth2Client } from 'google-auth-library';
+import {ConfigService} from "@nestjs/config";
 
 @Injectable()
 export class AuthService {
   constructor(private usersService: UsersService,
               private jwtservice: JwtService,
               private mailService: MailService,
+              private config: ConfigService,
               @Inject(CACHE_MANAGER) private cacheManager: Cache,) {}
 
   async register(data: RegisterDto): Promise<{ access_token: string }> {
@@ -71,5 +74,50 @@ export class AuthService {
     if (ttl > 0) {
       await this.cacheManager.set(`blacklist:${token}`, true, ttl * 1000);
     }
+  }
+
+  async handleOAuthUser(email: string, username: string, provider: OAuthProvider): Promise<{ access_token: string }> {
+    let user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      user = await this.usersService.create({
+        email,
+        username,
+        oAuthProvider: provider,
+        emailisVerified: true,
+      });
+    }
+
+    return {
+      access_token: this.jwtservice.sign({ sub: user.id, username: user.username }),
+    };
+  }
+
+  async verifyGoogleToken(token: string): Promise<{ email: string; username: string }> {
+    const client = new OAuth2Client();
+
+    const audiences = [
+      this.config.get<string>('GOOGLE_CLIENT_ID_ANDROID')!,
+    ];
+
+    const iosClientId = this.config.get<string>('GOOGLE_CLIENT_ID_IOS');
+    if (iosClientId) {
+      audiences.push(iosClientId);
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: audiences,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+
+    return {
+      email: payload.email!,
+      username: payload.name!,
+    };
   }
 }
