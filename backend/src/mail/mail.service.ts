@@ -29,4 +29,21 @@ export class MailService {
             html: `<p>Click <a href="${verificationUrl}">here</a> to verify your email.</p>`,
         });
     }
+
+    async sendPasswordResetEmail(to: string, token: string): Promise<void> {
+        const baseUrl = this.config.get<string>('APP_URL');
+        const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`;
+
+        await this.transporter.sendMail({
+            from: '"Music Room" <noreply@musicroom.com>',
+            to,
+            subject: 'Reset your password',
+            html: `
+            <h2>Reset your Music Room password</h2>
+            <p>Click the link below to reset your password. This link expires in 15 minutes.</p>
+            <a href="${resetUrl}">Reset my password</a>
+            <p>If you didn't request this, ignore this email.</p>
+        `,
+        });
+    }
 }

@@ -18,6 +18,7 @@ import { Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {JwtAuthGuard} from "./guards/jwt-auth.guard";
 import {AuthGuard} from "@nestjs/passport";
+import {ResetPasswordDto} from "./dto/ResetPassword.dto";
 
 @ApiTags('auth')
 @Controller('auth')
@@ -89,5 +90,20 @@ export class AuthController {
     @UseGuards(AuthGuard('google'))
     async googleCallback(@Req() req: any) {
         return await this.authService.handleOAuthUser(req.user.email, req.user.username, req.user.provider);
+    }
+
+    @ApiOperation({ summary: 'Request password reset email' })
+    @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
+    @Post('forgot-password')
+    async forgot_password(@Body('email') email: string) {
+        return await this.authService.forgot_password(email);
+    }
+
+    @ApiOperation({ summary: 'Reset password with token' })
+    @ApiResponse({ status: 200, description: 'Password reset successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+    @Post('reset-password')
+    async reset_password(@Body() dto: ResetPasswordDto) {
+        return await this.authService.resetPassword(dto.token, dto.newPassword);
     }
 }
