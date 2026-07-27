@@ -1,13 +1,23 @@
-import {Controller, Post, Body, Get, Query, BadRequestException, UseGuards, Headers as NestHeaders} from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Body,
+    Get,
+    Query,
+    BadRequestException,
+    UseGuards,
+    Headers as NestHeaders,
+    Req
+} from '@nestjs/common';
 import {RegisterDto} from "./dto/register.dto";
 import {AuthService} from "./auth.service";
 import {ApiTags, ApiOperation, ApiResponse, ApiQuery} from '@nestjs/swagger';
 import {LoginDto} from "./dto/login.dto";
-import {MailService} from "../mail/mail.service";
 import {UsersService} from "../users/users.service";
 import { Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {JwtAuthGuard} from "./guards/jwt-auth.guard";
+import {AuthGuard} from "@nestjs/passport";
 
 @ApiTags('auth')
 @Controller('auth')
@@ -68,5 +78,16 @@ export class AuthController {
 
         res.setHeader('Content-Type', 'text/html');
         res.send(html);
+    }
+
+    @ApiOperation({ summary: 'Redirect to Google OAuth' })
+    @Get('google/web')
+    @UseGuards(AuthGuard('google'))
+    async googleAuth() {}
+
+    @Get('google/web/callback')
+    @UseGuards(AuthGuard('google'))
+    async googleCallback(@Req() req: any) {
+        return await this.authService.handleOAuthUser(req.user.email, req.user.username, req.user.provider);
     }
 }
