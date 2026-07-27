@@ -19,6 +19,7 @@ import type { Response } from 'express';
 import {JwtAuthGuard} from "./guards/jwt-auth.guard";
 import {AuthGuard} from "@nestjs/passport";
 import {ResetPasswordDto} from "./dto/ResetPassword.dto";
+import {OAuthProvider} from "../users/user.entity";
 
 @ApiTags('auth')
 @Controller('auth')
@@ -90,6 +91,12 @@ export class AuthController {
     @UseGuards(AuthGuard('google'))
     async googleCallback(@Req() req: any) {
         return await this.authService.handleOAuthUser(req.user.email, req.user.username, req.user.provider);
+    }
+
+    @Post('google/mobile')
+    async googleMobile(@Body() body: { token: string }) {
+        const { email, username } = await this.authService.verifyGoogleToken(body.token);
+        return await this.authService.handleOAuthUser(email, username, OAuthProvider.GOOGLE);
     }
 
     @ApiOperation({ summary: 'Request password reset email' })
