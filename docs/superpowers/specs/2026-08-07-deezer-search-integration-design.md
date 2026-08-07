@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-07
 **Scope:** `mobile/` only (no backend changes)
-**Branch:** `feat/mobile/deezer-search`
+**Branch:** `feat/deezer-search`
 
 ---
 
