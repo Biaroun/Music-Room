@@ -25,6 +25,17 @@ export class FriendshipController {
         };
     }
 
+    @ApiOperation({ summary: 'Cancel a pending friend request I sent' })
+    @ApiParam({ name: 'requestId', description: 'Id of the friend request to cancel' })
+    @ApiResponse({ status: 200, description: 'Friend request cancelled' })
+    @ApiResponse({ status: 404, description: 'Request not found' })
+    @UseGuards(JwtAuthGuard)
+    @Delete('request/:requestId')
+    async cancelSentRequest(@CurrentUser() user: { id: number }, @Param('requestId') requestId: string) {
+        await this.friendshipService.cancelSentRequest(parseInt(requestId), user.id);
+        return { message: 'Friend request cancelled' };
+    }
+
     @ApiOperation({ summary: 'Accept a pending friend request' })
     @ApiParam({ name: 'requestId', description: 'Id of the friend request to accept' })
     @ApiResponse({ status: 200, description: 'Friend request accepted' })
@@ -91,6 +102,20 @@ export class FriendshipController {
         }));
     }
 
+    @ApiOperation({ summary: 'List my pending friend requests (sent)' })
+    @ApiResponse({ status: 200, description: 'List of pending friend requests I sent' })
+    @UseGuards(JwtAuthGuard)
+    @Get('pending/sent')
+    async getSentPendingRequests(@CurrentUser() user: { id: number }) {
+        const requests = await this.friendshipService.getSentPendingRequests(user.id);
+        return requests.map(request => ({
+            id: request.id,
+            to: request.receiver.username,
+            toId: request.receiver.id,
+            createdAt: request.createdAt,
+        }));
+    }
+
     @ApiOperation({ summary: 'List my friends (accepted requests)' })
     @ApiResponse({ status: 200, description: 'List of friends' })
     @UseGuards(JwtAuthGuard)
@@ -103,6 +128,7 @@ export class FriendshipController {
                 id: relation.id,
                 friendId: friend.id,
                 username: friend.username,
+                avatar: friend.avatar,
             };
         });
     }
@@ -116,7 +142,9 @@ export class FriendshipController {
         return blocks.map(block => ({
             id: block.id,
             blockedBy: block.requester.username,
+            blockedById: block.requester.id,
             blockedUser: block.receiver.username,
+            blockedUserId: block.receiver.id,
             isBlockedByMe: block.requester.id === user.id,
         }));
     }

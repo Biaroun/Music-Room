@@ -107,6 +107,26 @@ export class FriendshipService {
         return;
     }
 
+    async getSentPendingRequests(requesterId: number): Promise<Friendship[]> {
+        return await this.friendshipRepository.find({
+            where: { requester: { id: requesterId }, status: FriendshipStatus.PENDING },
+            relations: ['requester', 'receiver'],
+        });
+    }
+
+    async cancelSentRequest(requestId: number, requesterId: number): Promise<void> {
+        const relation = await this.friendshipRepository.findOne({
+            where: { id: requestId, requester: { id: requesterId }, status: FriendshipStatus.PENDING },
+            relations: ['requester', 'receiver'],
+        });
+
+        if (!relation) {
+            throw new NotFoundException('Request didnt exist');
+        }
+        await this.friendshipRepository.delete(relation.id);
+        return;
+    }
+
     async getPendingRequests(receiverId: number): Promise<Friendship[]> {
         return await this.friendshipRepository.find({
             where: { receiver: { id: receiverId }, status: FriendshipStatus.PENDING },

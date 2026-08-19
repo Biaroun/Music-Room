@@ -41,6 +41,7 @@ export class UsersService {
         emailisVerified: true,
         oAuthProvider: true,
         bio: true,
+        avatar: true,
         musicpreferences: true,
         visibilitySettings: true,
         emailVerificationToken: true,
@@ -49,6 +50,23 @@ export class UsersService {
         updatedAt: true,
       }
     });
+  }
+
+  // q vide => on liste tout le monde (sauf soi), utilise par la page Amis pour
+  // afficher les "inconnus" ; q rempli => filtre sur le username.
+  async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .where('user.id != :excludeId', { excludeId: excludeUserId })
+      .select(['user.id', 'user.username', 'user.avatar'])
+      .orderBy('user.username', 'ASC')
+      .limit(50);
+
+    if (query) {
+      qb.andWhere('LOWER(user.username) LIKE :q', { q: `%${query.toLowerCase()}%` });
+    }
+
+    return qb.getMany();
   }
 
   async create(data: Partial<User>): Promise<User> {
@@ -132,6 +150,9 @@ export class UsersService {
     }
     if (data.bio) {
       user.bio = data.bio;
+    }
+    if (data.avatar !== undefined) {
+      user.avatar = data.avatar === '' ? null : data.avatar;
     }
     if (data.musicpreferences) {
       user.musicpreferences = [...new Set(data.musicpreferences)];

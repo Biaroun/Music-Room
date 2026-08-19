@@ -4,7 +4,6 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
-import { storage } from '../config/storage';
 import { AVATARS } from '../config/avatars';
 
 type MusicGenre = 'rap' | 'rnb' | 'rock' | 'pop' | 'jazz' | 'classical' | 'electro' | 'reggae' | 'metal' | 'country';
@@ -31,13 +30,12 @@ export default function EditProfileScreen({ navigation }: any) {
   const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    // le back ne persiste plus `avatar` (colonne retirée) : source de vérité locale.
-    Promise.all([apiFetch('/users/me', token), storage.getItem('profile_avatar')])
-      .then(([me, storedAvatar]) => {
+    apiFetch('/users/me', token)
+      .then((me) => {
         setBio(me.bio ?? '');
         setGenres(me.musicpreferences ?? []);
         setVisibility((v) => ({ ...v, ...(me.visibilitySettings ?? {}) }));
-        setAvatar(storedAvatar || null);
+        setAvatar(me.avatar || null);
       })
       .catch((e: any) => Alert.alert('Error', e.message))
       .finally(() => setLoading(false));
@@ -54,7 +52,6 @@ export default function EditProfileScreen({ navigation }: any) {
         method: 'PATCH',
         body: JSON.stringify({ bio, musicpreferences: genres, visibilitySettings: visibility, avatar: avatar ?? '' }),
       });
-      await storage.setItem('profile_avatar', avatar ?? '');
       Alert.alert('Saved', 'Profile updated');
       navigation.goBack();
     } catch (e: any) {

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlaylistEditorController } from './playlist-editor.controller';
+import { PlaylistEditorService } from './playlist-editor.service';
 
 describe('PlaylistEditorController', () => {
   let controller: PlaylistEditorController;
@@ -7,6 +8,7 @@ describe('PlaylistEditorController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PlaylistEditorController],
+      providers: [{ provide: PlaylistEditorService, useValue: {} }],
     }).compile();
 
     controller = module.get<PlaylistEditorController>(PlaylistEditorController);
