@@ -35,3 +35,6 @@ docker-down:
 
 test:
 	cd backend && npm run test
+
+seed-users:
+	API_URL=$(API_URL) node scripts/seed-users.js

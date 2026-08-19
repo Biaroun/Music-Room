@@ -64,6 +64,9 @@ export class User {
   @Column({ nullable: true })
   bio: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  avatar: string | null;
+
   @Column('simple-array', { nullable: true })
   musicpreferences: MusicGenre[];
 

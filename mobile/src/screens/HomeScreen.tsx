@@ -6,11 +6,12 @@ import { colors, spacing, typography } from '../config/theme';
 import { ui } from '../config/ui';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import TrackSearch from '../components/TrackSearch';
 
 type Shortcut = { title: string; icon: React.ComponentProps<typeof Ionicons>['name']; screen?: string; color: string; soon?: boolean };
 
 const SHORTCUTS: Shortcut[] = [
-  { title: 'Playlist Editor', icon: 'musical-notes', screen: 'PlaylistEditor', color: '#1DB954' },
+  { title: 'Playlists', icon: 'musical-notes', screen: 'Playlists', color: '#1DB954' },
   { title: 'My Profile', icon: 'person', screen: 'Profile', color: '#8b5cf6' },
   { title: 'Settings', icon: 'settings', screen: 'Settings', color: '#3b82f6' },
   { title: 'Track Vote', icon: 'bar-chart', screen: 'TrackVote', color: '#e8115b' },
@@ -43,6 +44,8 @@ export default function HomeScreen({ navigation }: any) {
     <ScrollView style={ui.screen} contentContainerStyle={{ padding: spacing.md }}>
       <Text style={styles.greeting}>{greeting()}{username ? `, ${username}` : ''}</Text>
 
+      <TrackSearch placeholder="Search music…" />
+
       <View style={styles.grid}>
         {SHORTCUTS.map((s) => (
           <TouchableOpacity
@@ -64,11 +67,11 @@ export default function HomeScreen({ navigation }: any) {
       </View>
 
       <Text style={[typography.h2, ui.section]}>Made for you</Text>
-      <TouchableOpacity style={styles.feature} onPress={() => navigation.navigate('PlaylistEditor')} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.feature} onPress={() => navigation.navigate('Playlists')} activeOpacity={0.85}>
         <View style={styles.featureArt}><Ionicons name="musical-notes" size={28} color="#fff" /></View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.featureTitle}>Build your playlist</Text>
-          <Text style={styles.featureSub}>Add, reorder and share your tracks</Text>
+          <Text style={styles.featureTitle}>Your playlists</Text>
+          <Text style={styles.featureSub}>Create, edit and play your playlists</Text>
         </View>
         <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
       </TouchableOpacity>

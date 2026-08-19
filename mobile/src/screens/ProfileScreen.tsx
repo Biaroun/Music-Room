@@ -7,7 +7,6 @@ import { colors, typography, spacing } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
 import { getAvatar } from '../config/avatars';
-import { storage } from '../config/storage';
 
 type Visibility = 'public' | 'friends-only' | 'private';
 type Me = {
@@ -15,6 +14,7 @@ type Me = {
   email: string;
   emailisVerified: boolean;
   bio?: string | null;
+  avatar?: string | null;
   musicpreferences?: string[] | null;
   visibilitySettings?: { username?: Visibility; bio?: Visibility; musicPreferences?: Visibility } | null;
 };
@@ -22,18 +22,15 @@ type Me = {
 export default function ProfileScreen({ navigation }: any) {
   const { token } = useAuth();
   const [me, setMe] = useState<Me | null>(null);
-  const [avatar, setAvatar] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      // le back ne persiste plus `avatar` (colonne retirée) : source de vérité locale.
-      Promise.all([apiFetch('/users/me', token), storage.getItem('profile_avatar')])
-        .then(([data, storedAvatar]) => {
+      apiFetch('/users/me', token)
+        .then((data) => {
           if (!active) return;
           setMe(data);
-          setAvatar(storedAvatar || null);
         })
         .catch((e: any) => Alert.alert('Error', e.message))
         .finally(() => { if (active) setLoading(false); });
@@ -46,7 +43,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const genres = me?.musicpreferences ?? [];
   const vis = me?.visibilitySettings ?? {};
-  const av = getAvatar(avatar);
+  const av = getAvatar(me?.avatar ?? null);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>

@@ -9,6 +9,7 @@
     "@react-navigation/native-stack": "^7.16.0",
     "@shopify/react-native-skia": "2.6.2",
     "expo": "~56.0.8",
+    "expo-audio": "~56.0.13",
     "expo-linear-gradient": "~56.0.4",
     "expo-secure-store": "~56.0.4",
     "expo-status-bar": "~56.0.4",

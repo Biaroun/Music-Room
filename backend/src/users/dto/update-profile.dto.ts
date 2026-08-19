@@ -4,11 +4,17 @@ import {
     MinLength,
     Matches,
     IsEmail,
-    MaxLength, IsArray, IsEnum, IsOptional,ValidateNested,
+    MaxLength, IsArray, IsEnum, IsOptional,ValidateNested, IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {MusicGenre, Visibility, VisibilitySettings} from "../user.entity";
+
+// doit rester en phase avec mobile/src/config/avatars.ts (pas de package partage entre back et mobile)
+export const AVATAR_IDS = [
+    'avatar-1', 'avatar-2', 'avatar-3', 'avatar-4',
+    'avatar-5', 'avatar-6', 'avatar-7', 'avatar-8',
+] as const;
 
 export class VisibilitySettingsDto {
     @IsEnum(Visibility)
@@ -36,6 +42,14 @@ export class UpdateProfileDto {
         message: "La bio contient des caractères non autorisés"
     })*/
     bio?: string;
+
+    @ApiProperty({
+        example: 'avatar-3',
+        description: "Un des 8 avatars predefinis (avatar-1..avatar-8), ou '' pour aucun avatar",
+    })
+    @IsIn([...AVATAR_IDS, ''])
+    @IsOptional()
+    avatar?: string;
 
     @ApiProperty({
         example: ['rap', 'rock'],

@@ -1,36 +1,110 @@
 // mobile/src/screens/PlaylistEditorScreen.tsx
-// MOCK : tout est en state local, aucun appel back.
-// Quand Biaroun aura les routes, on remplacera les setTracks(...) par des apiFetch.
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+// Charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../config/theme';
+import { getTrackBpm } from '../lib/deezer';
+import type { DeezerTrack } from '../lib/deezerTypes';
+import { usePreviewPlayer, type PreviewTrack } from '../context/PreviewPlayerContext';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
+import TrackSearch from '../components/TrackSearch';
+import {
+  type ApiPlaylistTrack,
+  getPlaylist,
+  updatePlaylist,
+  addTrackToPlaylist,
+  removeTrackFromPlaylist,
+  reorderPlaylistTracks,
+} from '../lib/playlists';
 
-type Track = { id: string; title: string; artist: string };
+type Track = ApiPlaylistTrack;
 
-const INITIAL: Track[] = [
-  { id: '1', title: 'Blinding Lights', artist: 'The Weeknd' },
-  { id: '2', title: 'HUMBLE.', artist: 'Kendrick Lamar' },
-  { id: '3', title: 'One More Time', artist: 'Daft Punk' },
-];
+function toPreviewTrack(tk: Track): PreviewTrack {
+  return {
+    id: String(tk.id),
+    title: tk.title,
+    artist: tk.artist,
+    artistId: tk.artistId ?? undefined,
+    cover: tk.cover,
+    previewUrl: tk.previewUrl,
+    bpm: tk.bpm,
+  };
+}
 
-export default function PlaylistEditorScreen() {
-  const [name, setName] = useState('My Playlist');
+export default function PlaylistEditorScreen({ route }: any) {
+  const playlistId: number = route.params.playlistId;
+  const { token } = useAuth();
+  const { showToast } = useToast();
+  const { activeTrack, isPlaying, toggle } = usePreviewPlayer();
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
-  const [tracks, setTracks] = useState<Track[]>(INITIAL);
-  const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
+  const [tracks, setTracks] = useState<Track[]>([]);
 
-  function addTrack() {
-    if (!title.trim()) return;
-    setTracks((t) => [...t, { id: Date.now().toString(), title: title.trim(), artist: artist.trim() || 'Unknown' }]);
-    setTitle('');
-    setArtist('');
+  useEffect(() => {
+    let active = true;
+    getPlaylist(playlistId, token)
+      .then((playlist) => {
+        if (!active) return;
+        setName(playlist.name);
+        setIsPublic(playlist.isPublic);
+        setTracks(playlist.tracks ?? []);
+      })
+      .catch(() => {
+        if (active) showToast({ type: 'error', message: 'Failed to load playlist' });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [playlistId]);
+
+  function saveName() {
+    if (!name.trim()) return;
+    updatePlaylist(playlistId, token, { name: name.trim() }).catch(() =>
+      showToast({ type: 'error', message: 'Failed to save name' })
+    );
   }
 
-  function removeTrack(id: string) {
-    setTracks((t) => t.filter((x) => x.id !== id));
+  function toggleVisibility() {
+    const next = !isPublic;
+    setIsPublic(next);
+    updatePlaylist(playlistId, token, { isPublic: next }).catch(() => {
+      setIsPublic(!next);
+      showToast({ type: 'error', message: 'Failed to update visibility' });
+    });
+  }
+
+  // Deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche —
+  // on le recupere avant l'ajout, comme ca le backend a directement la bonne valeur.
+  async function pickTrack(dt: DeezerTrack) {
+    const bpm = dt.bpm ?? (await getTrackBpm(dt.id).catch(() => null));
+    try {
+      const track = await addTrackToPlaylist(playlistId, token, {
+        deezerId: dt.id,
+        title: dt.title,
+        artist: dt.artist,
+        artistId: dt.artistId || undefined,
+        cover: dt.cover ?? undefined,
+        previewUrl: dt.previewUrl!,
+        bpm: bpm ?? undefined,
+      });
+      setTracks((t) => [...t, track]);
+    } catch {
+      showToast({ type: 'error', message: 'Failed to add track' });
+    }
+  }
+
+  async function removeTrack(trackId: number) {
+    try {
+      await removeTrackFromPlaylist(playlistId, trackId, token);
+      setTracks((t) => t.filter((x) => x.id !== trackId));
+    } catch {
+      showToast({ type: 'error', message: 'Failed to remove track' });
+    }
   }
 
   function move(index: number, dir: -1 | 1) {
@@ -39,9 +113,28 @@ export default function PlaylistEditorScreen() {
       if (j < 0 || j >= t.length) return t;
       const copy = [...t];
       [copy[index], copy[j]] = [copy[j], copy[index]];
+      reorderPlaylistTracks(playlistId, token, copy.map((tk) => tk.id)).catch(() =>
+        showToast({ type: 'error', message: 'Failed to save order' })
+      );
       return copy;
     });
   }
+
+  function playAll() {
+    if (tracks.length === 0) return;
+    const queue = tracks.map(toPreviewTrack);
+    toggle(queue[0], queue);
+  }
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  const wholePlaylistPlaying = tracks.length > 0 && activeTrack?.id === String(tracks[0].id) && isPlaying;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -60,6 +153,7 @@ export default function PlaylistEditorScreen() {
           style={styles.titleInput}
           value={name}
           onChangeText={setName}
+          onBlur={saveName}
           placeholder="Playlist name"
           placeholderTextColor={colors.textSecondary}
         />
@@ -67,15 +161,15 @@ export default function PlaylistEditorScreen() {
         <View style={styles.metaRow}>
           <Text style={styles.meta}>You</Text>
           <Text style={styles.dot}>•</Text>
-          <TouchableOpacity onPress={() => setIsPublic((p) => !p)}>
+          <TouchableOpacity onPress={toggleVisibility}>
             <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
           </TouchableOpacity>
           <Text style={styles.dot}>•</Text>
           <Text style={styles.meta}>{tracks.length} songs</Text>
         </View>
 
-        <TouchableOpacity style={styles.playFab} activeOpacity={0.85}>
-          <Ionicons name="play" size={22} color="#000" />
+        <TouchableOpacity style={styles.playFab} activeOpacity={0.85} onPress={playAll} disabled={tracks.length === 0}>
+          <Ionicons name={wholePlaylistPlaying ? 'pause' : 'play'} size={22} color="#000" />
         </TouchableOpacity>
       </LinearGradient>
 
@@ -85,12 +179,19 @@ export default function PlaylistEditorScreen() {
           <View key={tk.id} style={styles.row}>
             <Text style={styles.index}>{i + 1}</Text>
             <View style={styles.art}>
-              <Text style={styles.artText}>{tk.title[0]?.toUpperCase() ?? '?'}</Text>
+              {tk.cover ? (
+                <Image source={{ uri: tk.cover }} style={styles.artImg} />
+              ) : (
+                <Text style={styles.artText}>{tk.title[0]?.toUpperCase() ?? '?'}</Text>
+              )}
             </View>
             <View style={styles.trackInfo}>
               <Text style={styles.trackTitle} numberOfLines={1}>{tk.title}</Text>
               <Text style={styles.trackArtist} numberOfLines={1}>{tk.artist}</Text>
             </View>
+            <TouchableOpacity onPress={() => toggle(toPreviewTrack(tk))} style={styles.ctrl}>
+              <Ionicons name={activeTrack?.id === String(tk.id) && isPlaying ? 'pause' : 'play'} size={16} color={colors.accent} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => move(i, -1)} style={styles.ctrl}><Ionicons name="chevron-up" size={16} color={colors.textSecondary} /></TouchableOpacity>
             <TouchableOpacity onPress={() => move(i, 1)} style={styles.ctrl}><Ionicons name="chevron-down" size={16} color={colors.textSecondary} /></TouchableOpacity>
             <TouchableOpacity onPress={() => removeTrack(tk.id)} style={styles.ctrl}><Ionicons name="close" size={16} color="#f87171" /></TouchableOpacity>
@@ -100,13 +201,7 @@ export default function PlaylistEditorScreen() {
 
         {/* Add a track */}
         <Text style={styles.addTitle}>Add a track</Text>
-        <TextInput style={styles.input} value={title} onChangeText={setTitle}
-          placeholder="Title" placeholderTextColor={colors.textSecondary} />
-        <TextInput style={styles.input} value={artist} onChangeText={setArtist}
-          placeholder="Artist" placeholderTextColor={colors.textSecondary} />
-        <TouchableOpacity style={styles.addBtn} onPress={addTrack} activeOpacity={0.85}>
-          <Ionicons name="add" size={16} color="#000" /><Text style={styles.addBtnText}>  Add track</Text>
-        </TouchableOpacity>
+        <TrackSearch onSelect={pickTrack} />
       </View>
     </ScrollView>
   );
@@ -138,7 +233,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   index: { width: 22, textAlign: 'center', color: colors.textSecondary, fontSize: 14, fontVariant: ['tabular-nums'] },
-  art: { width: 44, height: 44, borderRadius: 4, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm, marginRight: spacing.md },
+  art: { width: 44, height: 44, borderRadius: 4, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm, marginRight: spacing.md, overflow: 'hidden' },
+  artImg: { width: '100%', height: '100%' },
   artText: { color: colors.textSecondary, fontSize: 18, fontWeight: '800' },
   trackInfo: { flex: 1, marginRight: spacing.sm },
   trackTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
@@ -147,7 +243,4 @@ const styles = StyleSheet.create({
   empty: { color: colors.textSecondary, fontSize: 14, paddingVertical: spacing.md },
 
   addTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: spacing.xl, marginBottom: spacing.md },
-  input: { backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 6, padding: spacing.md, marginBottom: spacing.sm, fontSize: 14 },
-  addBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent, borderRadius: 24, paddingVertical: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.xs },
-  addBtnText: { color: '#000', fontWeight: '800', fontSize: 14 },
 });

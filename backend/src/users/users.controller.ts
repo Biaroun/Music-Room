@@ -1,4 +1,4 @@
-import {Body, Controller, Get, NotFoundException, Param, Patch, Req, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, NotFoundException, Param, Patch, Query, Req, UseGuards} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {ApiOperation, ApiResponse, ApiParam} from "@nestjs/swagger";
 import {CurrentUser} from "../auth/decorators/current-user.decorator";
@@ -14,6 +14,16 @@ export class UsersController {
     constructor(private usersService: UsersService,
                 private friendshipService: FriendshipService) {}
 
+
+    // doit rester declaree AVANT @Get(':id'), sinon /users/search tombe dans :id
+    @ApiOperation({ summary: 'Search or list users by username' })
+    @ApiResponse({ status: 200, description: 'Users matching the query (all users if q is empty)' })
+    @UseGuards(JwtAuthGuard)
+    @Get('search')
+    async searchUsers(@CurrentUser() user: { id: number }, @Query('q') query?: string) {
+        const users = await this.usersService.searchByUsername(query ?? '', user.id);
+        return users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar }));
+    }
 
     @ApiOperation({ summary: 'info about me' })
     @UseGuards(JwtAuthGuard)
@@ -32,6 +42,7 @@ export class UsersController {
             emailisVerified: fulluser.emailisVerified,
             musicpreferences: fulluser.musicpreferences,
             bio: fulluser.bio,
+            avatar: fulluser.avatar,
             visibilitySettings: fulluser.visibilitySettings,
             oAuthProvider: fulluser.oAuthProvider,
             createdAt: fulluser.createdAt,
@@ -53,6 +64,7 @@ export class UsersController {
             id: updatedUser.id,
             username: updatedUser.username,
             bio: updatedUser.bio,
+            avatar: updatedUser.avatar,
             musicpreferences: updatedUser.musicpreferences,
             visibilitySettings: updatedUser.visibilitySettings,
         };
@@ -113,6 +125,7 @@ export class UsersController {
         return {
             id: targetUser.id,
             username: targetUser.username,
+            avatar: targetUser.avatar,
             bio: isFieldVisible(visibility?.bio) ? targetUser.bio : null,
             musicpreferences: isFieldVisible(visibility?.musicPreferences) ? targetUser.musicpreferences : null,
         };
