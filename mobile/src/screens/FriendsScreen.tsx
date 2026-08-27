@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, TouchableOpacity, ActivityIndicator, TextInput, Modal, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions, TouchableOpacity, ActivityIndicator, TextInput, Modal, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -16,6 +16,9 @@ import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
 import { getAvatar } from '../config/avatars';
 import PoolBackground from './PoolBackground';
+import { useToast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useRealtime, type FriendListening } from '../context/RealtimeContext';
 
 const ME_SZ = 82;
 const FR_SZ = 58;
@@ -24,6 +27,9 @@ const PS_SZ = 46;   // pending envoyee
 const OT_SZ = 44;
 const GREEN = '#1DB954';
 const AMBER = '#f59e0b';
+// versions rgb : boxShadow a besoin de la couleur et de l'opacité dans la même valeur
+const GREEN_RGB = '29,185,84';
+const AMBER_RGB = '245,158,11';
 const COLORS = ['#e91e63',
                 '#8b5cf6',
                 '#f97316',
@@ -70,7 +76,7 @@ function floatOffsets(id: number) {
     ];
 }
 
-function UserBubble({ p, isSelected, onPress, vmin }: { p: Person; isSelected: boolean; onPress: () => void; vmin: number }) {
+function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; isSelected: boolean; onPress: () => void; vmin: number; listening?: FriendListening }) {
     const sz = p.status === 'friend' ? FR_SZ
         : p.status === 'pending_received' ? PR_SZ
         : p.status === 'pending_sent' ? PS_SZ
@@ -183,9 +189,11 @@ function UserBubble({ p, isSelected, onPress, vmin }: { p: Person; isSelected: b
                             : p.status === 'pending_received' ? AMBER
                             : p.status === 'pending_sent' ? 'rgba(29,185,84,0.5)'
                             : 'rgba(255,255,255,0.1)',
-                        shadowColor: p.status === 'friend' ? GREEN : p.status === 'pending_received' ? AMBER : '#000',
-                        shadowOpacity: p.status === 'friend' || p.status === 'pending_received' ? 0.7 : 0.5,
-                        shadowRadius: p.status === 'friend' || p.status === 'pending_received' ? 18 : 10,
+                        boxShadow: p.status === 'friend'
+                            ? `0 4px 18px rgba(${GREEN_RGB},0.7)`
+                            : p.status === 'pending_received'
+                            ? `0 4px 18px rgba(${AMBER_RGB},0.7)`
+                            : '0 4px 10px rgba(0,0,0,0.5)',
                     },
                     circleStyle,
                 ]}>
@@ -207,6 +215,13 @@ function UserBubble({ p, isSelected, onPress, vmin }: { p: Person; isSelected: b
                         </>
                     )}
                 </Animated.View>
+
+                {/* pastille : cet ami écoute quelque chose en ce moment */}
+                {listening && (
+                    <View style={[styles.playingBadge, { left: sz - 14 }]}>
+                        <Ionicons name="musical-note" size={10} color="#04150b" />
+                    </View>
+                )}
 
                 <Text style={[styles.bubbleName, {
                     color: p.status === 'friend' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.25)',
@@ -292,6 +307,8 @@ function MeBubble({ avatarId }: { avatarId: string | null }) {
 
 export default function FriendsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
+    const { showToast } = useToast();
+    const { friendsListening } = useRealtime();
     const { width: W, height: H } = useWindowDimensions();
     const vmin = Math.min(W, H);
     const cx = W / 2;
@@ -309,6 +326,7 @@ export default function FriendsScreen({ navigation }: any) {
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [searching, setSearching] = useState(false);
     const [searchUnavailable, setSearchUnavailable] = useState(false);
+    const [blockTarget, setBlockTarget] = useState<{ id: number; username: string } | null>(null);
 
     const loadData = useCallback(async () => {
         let mappedFriends: Person[] = [];
@@ -418,13 +436,13 @@ export default function FriendsScreen({ navigation }: any) {
     async function sendRequest(targetId: number) {
         try {
             const res = await apiFetch(`/friendship/request/${targetId}`, token, { method: 'POST' });
-            Alert.alert('Demande envoyee', `Demande envoyee à ${res.receiver}`);
+            showToast({ type: 'success', message: `Demande envoyée à ${res.receiver}` });
             setSearchQuery('');
             setSearchResults([]);
             setSearchOpen(false);
             loadData();
         } catch (e: any) {
-            Alert.alert('Erreur', e.message);
+            showToast({ type: 'error', message: e.message });
         }
     }
 
@@ -433,7 +451,7 @@ export default function FriendsScreen({ navigation }: any) {
             await apiFetch(`/friendship/request/${requestId}`, token, { method: 'DELETE' });
             loadData();
         } catch (e: any) {
-            Alert.alert('Erreur', e.message);
+            showToast({ type: 'error', message: e.message });
         }
     }
 
@@ -442,34 +460,30 @@ export default function FriendsScreen({ navigation }: any) {
             await apiFetch(`/friendship/${requestId}/${action}`, token, { method: 'PATCH' });
             loadData();
         } catch (e: any) {
-            Alert.alert('Erreur', e.message);
+            showToast({ type: 'error', message: e.message });
         }
     }
 
     function confirmBlock(targetId: number, username: string) {
-        Alert.alert(
-            'Bloquer cet utilisateur ?',
-            `${username} disparaitra de ton holographe.`,
-            [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                    text: 'Bloquer',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await apiFetch(`/friendship/block/${targetId}`, token, { method: 'POST' });
-                            loadData();
-                        } catch (e: any) {
-                            Alert.alert('Erreur', e.message);
-                        }
-                    },
-                },
-            ],
-        );
+        setBlockTarget({ id: targetId, username });
+    }
+
+    async function performBlock() {
+        if (!blockTarget) return;
+        const { id, username } = blockTarget;
+        setBlockTarget(null);
+        try {
+            await apiFetch(`/friendship/block/${id}`, token, { method: 'POST' });
+            showToast({ type: 'success', message: `${username} a été bloqué` });
+            loadData();
+        } catch (e: any) {
+            showToast({ type: 'error', message: e.message });
+        }
     }
 
     const everyone = useMemo(() => [...friends, ...others], [friends, others]);
     const selected = everyone.find(p => p.key === selKey) ?? null;
+    const selectedListening = selected?.status === 'friend' ? friendsListening[selected.userId] : undefined;
 
     if (loading) {
         return (
@@ -510,6 +524,7 @@ export default function FriendsScreen({ navigation }: any) {
                         p={p}
                         vmin={vmin}
                         isSelected={selKey === p.key}
+                        listening={p.status === 'friend' ? friendsListening[p.userId] : undefined}
                         onPress={() => setSelKey(prev => prev === p.key ? null : p.key)}
                     />
                 ))}
@@ -542,12 +557,28 @@ export default function FriendsScreen({ navigation }: any) {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.cardName}>{selected.username}</Text>
-                            <Text style={styles.cardStatus}>
-                                {selected.status === 'friend' && 'Aucune ecoute en cours'}
-                                {selected.status === 'pending_sent' && 'Demande envoyee, en attente'}
-                                {selected.status === 'pending_received' && "t'a envoye une demande d'ami"}
-                                {selected.status === 'stranger' && 'Pas encore ami'}
-                            </Text>
+                            {selected.status === 'friend' && selectedListening ? (
+                                <View style={styles.nowPlaying}>
+                                    {selectedListening.cover ? (
+                                        <Image source={{ uri: selectedListening.cover }} style={styles.nowPlayingCover} />
+                                    ) : (
+                                        <View style={styles.nowPlayingCover}>
+                                            <Ionicons name="musical-note" size={12} color={GREEN} />
+                                        </View>
+                                    )}
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.nowPlayingTitle} numberOfLines={1}>{selectedListening.title}</Text>
+                                        <Text style={styles.nowPlayingArtist} numberOfLines={1}>{selectedListening.artist}</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <Text style={styles.cardStatus}>
+                                    {selected.status === 'friend' && 'Aucune ecoute en cours'}
+                                    {selected.status === 'pending_sent' && 'Demande envoyee, en attente'}
+                                    {selected.status === 'pending_received' && "t'a envoye une demande d'ami"}
+                                    {selected.status === 'stranger' && 'Pas encore ami'}
+                                </Text>
+                            )}
                         </View>
                     </View>
                     <View style={styles.cardActions}>
@@ -555,7 +586,7 @@ export default function FriendsScreen({ navigation }: any) {
                             <TouchableOpacity
                                 key={lbl}
                                 style={styles.cardAction}
-                                onPress={() => Alert.alert('Bientôt', `"${lbl}" arrive bientôt`)}
+                                onPress={() => showToast({ type: 'info', message: `« ${lbl} » arrive bientôt` })}
                             >
                                 <Text style={styles.cardActionText}>{lbl}</Text>
                             </TouchableOpacity>
@@ -651,6 +682,16 @@ export default function FriendsScreen({ navigation }: any) {
                     </View>
                 </View>
             </Modal>
+
+            <ConfirmDialog
+                visible={!!blockTarget}
+                title="Bloquer cet utilisateur ?"
+                message={blockTarget ? `${blockTarget.username} disparaitra de ton holographe.` : undefined}
+                confirmLabel="Bloquer"
+                destructive
+                onConfirm={performBlock}
+                onCancel={() => setBlockTarget(null)}
+            />
         </View>
     );
 }
@@ -693,11 +734,7 @@ const styles = StyleSheet.create({
         backgroundColor: GREEN,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: GREEN,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.55,
-        shadowRadius: 18,
-        elevation: 6,
+        boxShadow: `0 0 18px rgba(${GREEN_RGB},0.55)`,
     },
     headerTitle: {
         fontSize: 20,
@@ -816,8 +853,44 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 8,
+    },
+    playingBadge: {
+        position: 'absolute',
+        top: -2,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: GREEN,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#030d1d',
+        zIndex: 30,
+    },
+    nowPlaying: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
+    },
+    nowPlayingCover: {
+        width: 28,
+        height: 28,
+        borderRadius: 4,
+        backgroundColor: 'rgba(29,185,84,0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    nowPlayingTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: GREEN,
+    },
+    nowPlayingArtist: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.45)',
+        marginTop: 1,
     },
     bubbleIni: {
         fontWeight: '700',
@@ -863,11 +936,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        shadowColor: '#1DB954',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 28,
-        elevation: 10,
+        boxShadow: `0 0 28px rgba(${GREEN_RGB},0.6)`,
     },
     meLabel: {
         marginTop: 10,

@@ -28,6 +28,12 @@ export class VisibilitySettingsDto {
     @IsEnum(Visibility)
     @IsOptional()
     musicPreferences?: Visibility;
+
+    // Sans ce champ, whitelist:true du ValidationPipe global le supprimerait
+    // silencieusement de la requête.
+    @IsEnum(Visibility)
+    @IsOptional()
+    listening?: Visibility;
 }
 
 export class UpdateProfileDto {
@@ -66,8 +72,9 @@ export class UpdateProfileDto {
             username: 'public',
             bio: 'friends-only',
             musicPreferences: 'private',
+            listening: 'friends-only',
         },
-        description: 'Visibility settings for username, bio and music preferences',
+        description: 'Visibility settings for username, bio, music preferences and current listening',
     })
     @IsOptional()
     @ValidateNested()

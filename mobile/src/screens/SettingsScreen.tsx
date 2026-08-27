@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../config/theme';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, radius, spacing, typography } from '../config/theme';
+import { ui } from '../config/ui';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import { useToast } from '../components/Toast';
+import Screen from '../components/Screen';
+import Field from '../components/Field';
+import Button from '../components/Button';
 
 type Me = { id: number; username: string; email: string; emailisVerified: boolean };
 
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/;
+
 export default function SettingsScreen({ navigation }: any) {
   const { token, logout } = useAuth();
+  const { showToast } = useToast();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPwd, setSavingPwd] = useState(false);
 
   const [newemail, setNewemail] = useState('');
   const [emailPwd, setEmailPwd] = useState('');
@@ -21,92 +30,157 @@ export default function SettingsScreen({ navigation }: any) {
 
   async function loadMe() {
     try { setMe(await apiFetch('/users/me', token)); }
-    catch (e: any) { Alert.alert('Error', e.message); }
+    catch (e: any) { showToast({ type: 'error', message: e.message }); }
     finally { setLoading(false); }
   }
   useEffect(() => { loadMe(); }, []);
 
   async function changeEmail() {
     if (!newemail || !emailPwd) return;
-    setSaving(true);
+    setSavingEmail(true);
     try {
       await apiFetch('/users/me/email', token, {
         method: 'PATCH',
         body: JSON.stringify({ newemail, currentpassword: emailPwd }),
       });
-      Alert.alert('Email updated', 'Check your inbox to verify the new address.');
+      showToast({ type: 'success', message: 'Email updated — check your inbox to verify it.' });
       setNewemail(''); setEmailPwd(''); loadMe();
-    } catch (e: any) { Alert.alert('Error', e.message); }
-    finally { setSaving(false); }
+    } catch (e: any) { showToast({ type: 'error', message: e.message }); }
+    finally { setSavingEmail(false); }
   }
 
   async function changePassword() {
-    if (!curPwd || !newPwd || !newPwdConfirm) return;
-    if (newPwd !== newPwdConfirm) return Alert.alert('Error', 'Passwords do not match');
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/.test(newPwd))
-      return Alert.alert('Error', 'Min 12 chars, with upper, lower, number and special char.');
-    setSaving(true);
+    if (!pwdFormValid) return;
+    setSavingPwd(true);
     try {
       await apiFetch('/users/me/password', token, {
         method: 'PATCH',
         body: JSON.stringify({ currentpassword: curPwd, newpassword: newPwd, newpasswordConfirm: newPwdConfirm }),
       });
-      Alert.alert('Success', 'Password updated');
+      showToast({ type: 'success', message: 'Password updated' });
       setCurPwd(''); setNewPwd(''); setNewPwdConfirm('');
-    } catch (e: any) { Alert.alert('Error', e.message); }
-    finally { setSaving(false); }
+    } catch (e: any) { showToast({ type: 'error', message: e.message }); }
+    finally { setSavingPwd(false); }
   }
 
-  if (loading)
-    return <View style={[styles.container, { justifyContent: 'center' }]}><ActivityIndicator color={colors.accent} /></View>;
+  // Validation affichée pendant la saisie plutôt qu'en pop-up après coup.
+  const weakPwd = newPwd.length > 0 && !PASSWORD_RULE.test(newPwd);
+  const mismatch = newPwdConfirm.length > 0 && newPwd !== newPwdConfirm;
+  const pwdFormValid = !!curPwd && PASSWORD_RULE.test(newPwd) && newPwd === newPwdConfirm;
+
+  if (loading) {
+    return (
+      <Screen scroll={false} center>
+        <ActivityIndicator color={colors.accent} />
+      </Screen>
+    );
+  }
+
+  const verified = !!me?.emailisVerified;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>
-      <Text style={typography.h1}>Settings</Text>
-
-      <View style={styles.card}>
-        <Text style={typography.h2}>{me?.username}</Text>
-        <Text style={typography.caption}>{me?.email}</Text>
-        <View style={[styles.badge, { backgroundColor: me?.emailisVerified ? colors.accent : colors.surfaceAlt }]}>
-          <Ionicons name={me?.emailisVerified ? 'checkmark-circle' : 'close-circle'} size={12} color={colors.textPrimary} />
-          <Text style={styles.badgeText}>{me?.emailisVerified ? ' Email verified' : ' Email not verified'}</Text>
+    <Screen>
+      <View style={styles.account}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{me?.username?.[0]?.toUpperCase() ?? '?'}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={typography.h3}>{me?.username}</Text>
+          <Text style={[typography.caption, { marginTop: 2 }]}>{me?.email}</Text>
+          <View style={[ui.badge, { backgroundColor: verified ? colors.accentSoft : colors.surfaceAlt, marginTop: spacing.sm }]}>
+            <Ionicons
+              name={verified ? 'checkmark-circle' : 'alert-circle'}
+              size={13}
+              color={verified ? colors.accent : colors.warning}
+            />
+            <Text style={[ui.badgeText, { color: verified ? colors.accent : colors.warning }]}>
+              {verified ? 'Email verified' : 'Email not verified'}
+            </Text>
+          </View>
         </View>
       </View>
 
-      <Text style={[typography.h2, styles.section]}>Change email</Text>
-      <TextInput style={styles.input} placeholder="New email" placeholderTextColor={colors.textSecondary}
-        value={newemail} onChangeText={setNewemail} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Current password" placeholderTextColor={colors.textSecondary}
-        value={emailPwd} onChangeText={setEmailPwd} secureTextEntry />
-      <TouchableOpacity style={styles.button} onPress={changeEmail} disabled={saving}>
-        <Text style={styles.buttonText}>Update email</Text></TouchableOpacity>
+      <Text style={[typography.h2, ui.section]}>Change email</Text>
+      <View style={ui.card}>
+        <Field
+          label="New email"
+          placeholder="you@example.com"
+          value={newemail}
+          onChangeText={setNewemail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Field
+          label="Current password"
+          placeholder="••••••••"
+          value={emailPwd}
+          onChangeText={setEmailPwd}
+          secureTextEntry
+        />
+        <Button
+          title="Update email"
+          onPress={changeEmail}
+          loading={savingEmail}
+          disabled={!newemail || !emailPwd}
+          style={{ marginTop: spacing.sm }}
+        />
+      </View>
 
-      <Text style={[typography.h2, styles.section]}>Change password</Text>
-      <TextInput style={styles.input} placeholder="Current password" placeholderTextColor={colors.textSecondary}
-        value={curPwd} onChangeText={setCurPwd} secureTextEntry />
-      <TextInput style={styles.input} placeholder="New password (min 12 chars)" placeholderTextColor={colors.textSecondary}
-        value={newPwd} onChangeText={setNewPwd} secureTextEntry />
-      <TextInput style={styles.input} placeholder="Confirm new password" placeholderTextColor={colors.textSecondary}
-        value={newPwdConfirm} onChangeText={setNewPwdConfirm} secureTextEntry />
-      <TouchableOpacity style={styles.button} onPress={changePassword} disabled={saving}>
-        <Text style={styles.buttonText}>Update password</Text></TouchableOpacity>
+      <Text style={[typography.h2, ui.section]}>Change password</Text>
+      <View style={ui.card}>
+        <Field label="Current password" placeholder="••••••••" value={curPwd} onChangeText={setCurPwd} secureTextEntry />
+        <Field
+          label="New password"
+          placeholder="••••••••"
+          value={newPwd}
+          onChangeText={setNewPwd}
+          secureTextEntry
+          hint="Min 12 chars, with upper, lower, number and special char."
+          error={weakPwd ? 'Min 12 chars, with upper, lower, number and special char.' : null}
+        />
+        <Field
+          label="Confirm new password"
+          placeholder="••••••••"
+          value={newPwdConfirm}
+          onChangeText={setNewPwdConfirm}
+          secureTextEntry
+          error={mismatch ? 'Passwords do not match' : null}
+        />
+        <Button
+          title="Update password"
+          onPress={changePassword}
+          loading={savingPwd}
+          disabled={!pwdFormValid}
+          style={{ marginTop: spacing.sm }}
+        />
+      </View>
 
-      <TouchableOpacity style={[styles.button, styles.secondary]} onPress={() => navigation.goBack()}>
-        <Text style={[styles.buttonText, { color: colors.textPrimary }]}>Back to Home</Text></TouchableOpacity>
-      <TouchableOpacity style={{ marginTop: spacing.lg, alignItems: 'center' }} onPress={logout}>
-        <Text style={[typography.caption, { color: '#f87171' }]}>Log out</Text></TouchableOpacity>
-    </ScrollView>
+      <Text style={[typography.h2, ui.section]}>Session</Text>
+      <Button title="Back to Home" icon="arrow-back" variant="secondary" onPress={() => navigation.goBack()} />
+      <Button title="Log out" icon="log-out-outline" variant="danger" onPress={logout} style={{ marginTop: spacing.sm }} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  card: { backgroundColor: colors.surface, borderRadius: 8, padding: spacing.md, marginVertical: spacing.md },
-  badge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
-  badgeText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' },
-  section: { marginTop: spacing.lg, marginBottom: spacing.sm },
-  input: { backgroundColor: colors.surface, color: colors.textPrimary, borderRadius: 8, padding: spacing.md, marginBottom: spacing.sm, fontSize: 14 },
-  button: { backgroundColor: colors.accent, borderRadius: 24, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-  secondary: { backgroundColor: colors.surface },
-  buttonText: { color: colors.background, fontWeight: '700', fontSize: 16 },
+  account: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: colors.accent, fontSize: 22, fontWeight: '800' },
 });

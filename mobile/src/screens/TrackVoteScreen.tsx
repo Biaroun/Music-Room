@@ -1,27 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../config/theme';
+import Screen from '../components/Screen';
+import EmptyState from '../components/EmptyState';
 
 // écran en attente de l'API back (track vote pas encore fait)
 export default function TrackVoteScreen() {
   return (
-    <View style={styles.container}>
-      <Ionicons name="bar-chart" size={48} color={colors.accent} />
-      <Text style={[typography.h2, { marginTop: spacing.md }]}>Track Vote</Text>
-      <Text style={[typography.caption, { marginTop: spacing.xs, textAlign: 'center' }]}>
-        Bientôt disponible — en attente de l'API.
-      </Text>
-    </View>
+    <Screen scroll={false} center>
+      <EmptyState
+        icon="bar-chart-outline"
+        title="Track Vote"
+        message="Bientôt disponible — en attente de l'API. Vous pourrez voter en direct pour le prochain morceau d'une session."
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-});

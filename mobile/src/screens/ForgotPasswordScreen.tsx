@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../config/theme';
+import { View, Text, StyleSheet } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, radius, spacing, typography } from '../config/theme';
 import { apiFetch } from '../config/api';
 import { useToast } from '../components/Toast';
+import Screen from '../components/Screen';
+import Field from '../components/Field';
+import Button from '../components/Button';
 
 // écran mot de passe oublié : on saisit l'email, le back envoie un lien de reset par mail.
 // route /auth/forgot-password à faire côté back (Biaroun), en attendant l'appel échoue juste.
@@ -34,66 +38,54 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={[typography.h1, { marginBottom: spacing.xs }]}>Mot de passe oublié</Text>
-      <Text style={[typography.caption, { marginBottom: spacing.xl, textAlign: 'center' }]}>
-        Entre ton email, on t'envoie un lien pour réinitialiser ton mot de passe.
-      </Text>
+    <Screen narrow center>
+      <View style={styles.head}>
+        <View style={styles.icon}>
+          <Ionicons name="key-outline" size={24} color={colors.accent} />
+        </View>
+        <Text style={[typography.h2, { textAlign: 'center' }]}>Mot de passe oublié</Text>
+        <Text style={[typography.caption, styles.sub]}>
+          Entre ton email, on t'envoie un lien pour réinitialiser ton mot de passe.
+        </Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor={colors.textSecondary}
+      <Field
+        label="Email"
+        placeholder="you@example.com"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
+        onSubmitEditing={handleSubmit}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Envoi...' : 'Envoyer le lien'}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.link} onPress={() => navigation.goBack()}>
-        <Text style={typography.caption}>
-          <Text style={{ color: colors.accent }}>Retour à la connexion</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+      <Button
+        title="Envoyer le lien"
+        onPress={handleSubmit}
+        loading={loading}
+        disabled={!email.trim()}
+        style={{ marginTop: spacing.md }}
+      />
+      <Button
+        title="Retour à la connexion"
+        onPress={() => navigation.goBack()}
+        variant="ghost"
+        style={{ marginTop: spacing.sm }}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  head: { alignItems: 'center', marginBottom: spacing.lg },
+  icon: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  input: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    fontSize: 14,
-  },
-  button: {
-    width: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 24,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  buttonText: {
-    color: colors.background,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  link: {
-    marginTop: spacing.lg,
-  },
+  sub: { textAlign: 'center', marginTop: spacing.xs, lineHeight: 18, maxWidth: 320 },
 });

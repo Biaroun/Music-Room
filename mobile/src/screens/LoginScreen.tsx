@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { colors, typography, spacing } from '../config/theme';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, radius, spacing, typography } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
+import { useToast } from '../components/Toast';
+import Screen from '../components/Screen';
+import Field from '../components/Field';
+import Button from '../components/Button';
 
 export default function LoginScreen({ navigation }: any) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login: authLogin } = useAuth();
+  const { showToast } = useToast();
+
+  const canSubmit = login.trim().length > 0 && password.length > 0;
 
   async function handleLogin() {
-    if (!login || !password)
-      return;
+    if (!canSubmit) return;
     setLoading(true);
     try {
       const data = await apiFetch('/auth/login', null, {
@@ -21,85 +28,71 @@ export default function LoginScreen({ navigation }: any) {
       });
       await authLogin(data.access_token);
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showToast({ type: 'error', message: e.message });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={[typography.h1, { marginBottom: spacing.xs }]}>Music Room</Text>
-      <Text style={[typography.caption, { marginBottom: spacing.xl }]}>
-        Connect to your account
-      </Text>
+    <Screen narrow center>
+      <View style={styles.brand}>
+        <View style={styles.logo}>
+          <Ionicons name="musical-notes" size={26} color={colors.onAccent} />
+        </View>
+        <Text style={typography.h1}>Music Room</Text>
+        <Text style={[typography.caption, styles.tagline]}>Connect to your account</Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email or username"
-        placeholderTextColor={colors.textSecondary}
+      <Field
+        label="Email or username"
+        placeholder="you@example.com"
         value={login}
         onChangeText={setLogin}
         autoCapitalize="none"
+        autoComplete="username"
+        returnKeyType="next"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.textSecondary}
+      <Field
+        label="Password"
+        placeholder="••••••••"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        autoComplete="password"
+        returnKeyType="go"
+        onSubmitEditing={handleLogin}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Loading...' : 'Login'}</Text>
-      </TouchableOpacity>
+      <Button title="Login" onPress={handleLogin} loading={loading} disabled={!canSubmit} style={styles.submit} />
 
-      <TouchableOpacity style={styles.forgotLink} onPress={() => navigation.navigate('ForgotPassword')}>
-        <Text style={[typography.caption, { color: colors.accent }]}>Forgot password?</Text>
-      </TouchableOpacity>
+      <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={styles.link}>
+        <Text style={[typography.caption, { color: colors.accent, fontWeight: '600' }]}>Forgot password?</Text>
+      </Pressable>
 
-      <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Register')}>
-        <Text style={typography.caption}>No account? <Text style={{ color: colors.accent }}>Register</Text></Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.footer}>
+        <Text style={typography.caption}>No account? </Text>
+        <Pressable onPress={() => navigation.navigate('Register')}>
+          <Text style={[typography.caption, { color: colors.accent, fontWeight: '700' }]}>Register</Text>
+        </Pressable>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
+  brand: { alignItems: 'center', marginBottom: spacing.xl },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  input: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    fontSize: 14,
-  },
-  button: {
-    width: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 24,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  buttonText: {
-    color: colors.background,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  forgotLink: {
-    marginTop: spacing.md,
-  },
-  link: {
-    marginTop: spacing.lg,
-  },
+  tagline: { marginTop: spacing.xs },
+  submit: { marginTop: spacing.md },
+  link: { alignSelf: 'center', marginTop: spacing.lg, padding: spacing.xs, cursor: 'pointer' },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg, cursor: 'pointer' },
 });

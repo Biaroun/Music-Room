@@ -36,7 +36,15 @@ export interface VisibilitySettings {
   username: Visibility;
   bio: Visibility;
   musicPreferences: Visibility;
+  // Écoute en cours. Optionnel : les comptes créés avant l'ajout du champ n'ont
+  // pas la clé, on retombe alors sur FRIENDS_ONLY (cf. LISTENING_VISIBILITY_DEFAULT).
+  // Colonne simple-json, donc aucune migration nécessaire.
+  listening?: Visibility;
 }
+
+// Seuls les amis interrogent déjà l'écoute en cours : le choix qui compte
+// vraiment ici est PRIVATE, pour se rendre invisible même de ses amis.
+export const LISTENING_VISIBILITY_DEFAULT = Visibility.FRIENDS_ONLY;
 
 @Entity()
 export class User {

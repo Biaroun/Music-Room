@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../config/theme';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { colors, spacing, typography } from '../config/theme';
 import { apiFetch } from '../config/api';
 import { useToast } from '../components/Toast';
+import Screen from '../components/Screen';
+import Field from '../components/Field';
+import Button from '../components/Button';
 
 export default function RegisterScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
@@ -12,8 +15,12 @@ export default function RegisterScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
+  // Retour immédiat sur la confirmation : plus lisible qu'une erreur après l'envoi.
+  const mismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
+  const canSubmit = !!username && !!email && !!password && !!passwordConfirm && !mismatch;
+
   async function handleRegister() {
-    if (!username || !email || !password || !passwordConfirm) return;
+    if (!canSubmit) return;
     setLoading(true);
     try {
       await apiFetch('/auth/register', null, {
@@ -30,59 +37,52 @@ export default function RegisterScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={[typography.h1, { marginBottom: spacing.xs }]}>Music Room</Text>
-      <Text style={[typography.caption, { marginBottom: spacing.xl }]}>Create an account</Text>
+    <Screen narrow center>
+      <View style={styles.head}>
+        <Text style={typography.h1}>Create an account</Text>
+        <Text style={[typography.caption, { marginTop: spacing.xs }]}>Join Music Room in a few seconds</Text>
+      </View>
 
-      <TextInput style={styles.input} placeholder="Username" placeholderTextColor={colors.textSecondary}
-        value={username} onChangeText={setUsername} autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textSecondary}
-        value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Password" placeholderTextColor={colors.textSecondary}
-        value={password} onChangeText={setPassword} secureTextEntry />
-      <TextInput style={styles.input} placeholder="Confirm password" placeholderTextColor={colors.textSecondary}
-        value={passwordConfirm} onChangeText={setPasswordConfirm} secureTextEntry />
+      <Field label="Username" placeholder="dj_tom" value={username} onChangeText={setUsername} autoCapitalize="none" />
+      <Field
+        label="Email"
+        placeholder="you@example.com"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+      <Field
+        label="Password"
+        placeholder="••••••••"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+        hint="Min 12 characters, with upper, lower, number and special char."
+      />
+      <Field
+        label="Confirm password"
+        placeholder="••••••••"
+        value={passwordConfirm}
+        onChangeText={setPasswordConfirm}
+        secureTextEntry
+        error={mismatch ? 'Passwords do not match' : null}
+        onSubmitEditing={handleRegister}
+      />
 
-      <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'Loading...' : 'Register'}</Text>
-      </TouchableOpacity>
+      <Button title="Register" onPress={handleRegister} loading={loading} disabled={!canSubmit} style={{ marginTop: spacing.md }} />
 
-      <TouchableOpacity style={styles.link} onPress={() => navigation.goBack()}>
-        <Text style={typography.caption}>Already have an account? <Text style={{ color: colors.accent }}>Login</Text></Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.footer}>
+        <Text style={typography.caption}>Already have an account? </Text>
+        <Pressable onPress={() => navigation.goBack()}>
+          <Text style={[typography.caption, { color: colors.accent, fontWeight: '700' }]}>Login</Text>
+        </Pressable>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    fontSize: 14,
-  },
-  button: {
-    width: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 24,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  buttonText: {
-    color: colors.background,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  link: { marginTop: spacing.lg },
+  head: { alignItems: 'center', marginBottom: spacing.xl },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg, cursor: 'pointer' },
 });

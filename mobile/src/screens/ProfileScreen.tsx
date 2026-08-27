@@ -1,12 +1,16 @@
 // mobile/src/screens/ProfileScreen.tsx (read-only view)
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, typography, spacing } from '../config/theme';
+import { colors, radius, spacing, typography } from '../config/theme';
+import { ui } from '../config/ui';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../config/api';
 import { getAvatar } from '../config/avatars';
+import { useToast } from '../components/Toast';
+import Screen from '../components/Screen';
+import Button from '../components/Button';
 
 type Visibility = 'public' | 'friends-only' | 'private';
 type Me = {
@@ -16,11 +20,18 @@ type Me = {
   bio?: string | null;
   avatar?: string | null;
   musicpreferences?: string[] | null;
-  visibilitySettings?: { username?: Visibility; bio?: Visibility; musicPreferences?: Visibility } | null;
+  visibilitySettings?: { username?: Visibility; bio?: Visibility; musicPreferences?: Visibility; listening?: Visibility } | null;
+};
+
+const VIS_ICON: Record<Visibility, React.ComponentProps<typeof Ionicons>['name']> = {
+  public: 'earth',
+  'friends-only': 'people',
+  private: 'lock-closed',
 };
 
 export default function ProfileScreen({ navigation }: any) {
   const { token } = useAuth();
+  const { showToast } = useToast();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,21 +43,34 @@ export default function ProfileScreen({ navigation }: any) {
           if (!active) return;
           setMe(data);
         })
-        .catch((e: any) => Alert.alert('Error', e.message))
+        .catch((e: any) => showToast({ type: 'error', message: e.message }))
         .finally(() => { if (active) setLoading(false); });
       return () => { active = false; };
     }, [token])
   );
 
-  if (loading)
-    return <View style={[styles.container, { justifyContent: 'center' }]}><ActivityIndicator color={colors.accent} /></View>;
+  if (loading) {
+    return (
+      <Screen scroll={false} center>
+        <ActivityIndicator color={colors.accent} />
+      </Screen>
+    );
+  }
 
   const genres = me?.musicpreferences ?? [];
   const vis = me?.visibilitySettings ?? {};
   const av = getAvatar(me?.avatar ?? null);
+  const verified = !!me?.emailisVerified;
+
+  const visRows: { label: string; value: Visibility }[] = [
+    { label: 'Username', value: vis.username ?? 'public' },
+    { label: 'Bio', value: vis.bio ?? 'public' },
+    { label: 'Music preferences', value: vis.musicPreferences ?? 'public' },
+    { label: 'Current listening', value: vis.listening ?? 'friends-only' },
+  ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.md }}>
+    <Screen>
       <View style={styles.header}>
         {av ? (
           <Image source={av.source} style={styles.avatarImg} />
@@ -55,56 +79,91 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={styles.avatarText}>{me?.username?.[0]?.toUpperCase() ?? '?'}</Text>
           </View>
         )}
-        <Text style={typography.h1}>{me?.username}</Text>
-        <Text style={typography.caption}>{me?.email}</Text>
-        <View style={[styles.badge, { backgroundColor: me?.emailisVerified ? colors.accent : colors.surfaceAlt }]}>
-          <Ionicons name={me?.emailisVerified ? 'checkmark-circle' : 'close-circle'} size={12} color={colors.textPrimary} />
-          <Text style={styles.badgeText}>{me?.emailisVerified ? ' Email verified' : ' Email not verified'}</Text>
+        <Text style={[typography.h1, { marginTop: spacing.md }]}>{me?.username}</Text>
+        <Text style={[typography.caption, { marginTop: 2 }]}>{me?.email}</Text>
+        <View style={[ui.badge, { backgroundColor: verified ? colors.accentSoft : colors.surface, marginTop: spacing.sm }]}>
+          <Ionicons
+            name={verified ? 'checkmark-circle' : 'alert-circle'}
+            size={13}
+            color={verified ? colors.accent : colors.warning}
+          />
+          <Text style={[ui.badgeText, { color: verified ? colors.accent : colors.warning }]}>
+            {verified ? 'Email verified' : 'Email not verified'}
+          </Text>
         </View>
       </View>
 
-      <Text style={[typography.h2, styles.section]}>Bio</Text>
-      <Text style={[typography.body, !me?.bio && { color: colors.textSecondary }]}>
-        {me?.bio || 'No bio yet.'}
-      </Text>
+      <Text style={[typography.h2, ui.section]}>Bio</Text>
+      <View style={ui.card}>
+        <Text style={[typography.body, styles.bio, !me?.bio && { color: colors.textSecondary, fontStyle: 'italic' }]}>
+          {me?.bio || 'No bio yet.'}
+        </Text>
+      </View>
 
-      <Text style={[typography.h2, styles.section]}>Music preferences</Text>
+      <Text style={[typography.h2, ui.section]}>Music preferences</Text>
       {genres.length ? (
         <View style={styles.chips}>
           {genres.map((g) => (
-            <View key={g} style={styles.chip}><Text style={styles.chipText}>{g}</Text></View>
+            <View key={g} style={[ui.chip, styles.chipOn]}>
+              <Text style={[ui.chipText, { color: colors.accent }]}>{g}</Text>
+            </View>
           ))}
         </View>
       ) : (
-        <Text style={[typography.body, { color: colors.textSecondary }]}>No preferences yet.</Text>
+        <View style={ui.card}>
+          <Text style={[typography.body, { color: colors.textSecondary, fontStyle: 'italic' }]}>No preferences yet.</Text>
+        </View>
       )}
 
-      <Text style={[typography.h2, styles.section]}>Visibility</Text>
-      <View style={styles.visRow}><Text style={typography.body}>Username</Text><Text style={styles.visValue}>{vis.username ?? 'public'}</Text></View>
-      <View style={styles.visRow}><Text style={typography.body}>Bio</Text><Text style={styles.visValue}>{vis.bio ?? 'public'}</Text></View>
-      <View style={styles.visRow}><Text style={typography.body}>Music preferences</Text><Text style={styles.visValue}>{vis.musicPreferences ?? 'public'}</Text></View>
+      <Text style={[typography.h2, ui.section]}>Visibility</Text>
+      <View style={styles.visCard}>
+        {visRows.map((r, i) => (
+          <View key={r.label} style={[styles.visRow, i > 0 && styles.visRowBorder]}>
+            <Text style={typography.body}>{r.label}</Text>
+            <View style={styles.visValue}>
+              <Ionicons name={VIS_ICON[r.value]} size={13} color={colors.textSecondary} />
+              <Text style={styles.visValueText}>{r.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('EditProfile')}>
-        <Text style={styles.buttonText}>Edit profile</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      <Button
+        title="Edit profile"
+        icon="create-outline"
+        onPress={() => navigation.navigate('EditProfile')}
+        style={{ marginTop: spacing.xl }}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { alignItems: 'center', marginBottom: spacing.md },
-  avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
-  avatarImg: { width: 110, height: 110, borderRadius: 55, marginBottom: spacing.sm },
-  avatarText: { color: colors.background, fontSize: 44, fontWeight: '700' },
-  badge: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: 12 },
-  badgeText: { color: colors.textPrimary, fontSize: 11, fontWeight: '700' },
-  section: { marginTop: spacing.lg, marginBottom: spacing.sm },
+  header: { alignItems: 'center', paddingVertical: spacing.md },
+  avatar: {
+    width: 104,
+    height: 104,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImg: { width: 104, height: 104, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.border },
+  avatarText: { color: colors.onAccent, fontSize: 40, fontWeight: '800' },
+
+  bio: { lineHeight: 20 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: 16, backgroundColor: colors.surface },
-  chipText: { color: colors.textPrimary, fontSize: 13 },
-  visRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.surface },
-  visValue: { color: colors.accent, fontSize: 14, fontWeight: '700' },
-  button: { backgroundColor: colors.accent, borderRadius: 24, padding: spacing.md, alignItems: 'center', marginTop: spacing.xl },
-  buttonText: { color: colors.background, fontWeight: '700', fontSize: 16 },
+  chipOn: { backgroundColor: colors.accentSoft, borderColor: 'transparent' },
+
+  visCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+  },
+  visRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.sm + 2 },
+  visRowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  visValue: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  visValueText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
 });
