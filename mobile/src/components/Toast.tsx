@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Animated, Easing, Platform } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, layout, radius, shadows, spacing } from '../config/theme';
 
-type ToastType = 'success' | 'error';
+type ToastType = 'success' | 'error' | 'info';
 
 type ToastState = {
   visible: boolean;
@@ -20,37 +22,67 @@ export function useToast() {
   return useContext(ToastContext);
 }
 
+const STYLE_BY_TYPE: Record<ToastType, { bg: string; fg: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
+  success: { bg: colors.accent, fg: '#04150b', icon: 'checkmark-circle' },
+  error: { bg: colors.danger, fg: '#2a0b0b', icon: 'alert-circle' },
+  info: { bg: colors.surface, fg: colors.textPrimary, icon: 'information-circle' },
+};
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<ToastState>({ visible: false, type: 'success', message: '' });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
   function showToast({ type, message }: { type: ToastType; message: string }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     setToast({ visible: true, type, message });
-    timerRef.current = setTimeout(() => setToast(t => ({ ...t, visible: false })), 3500);
+    timerRef.current = setTimeout(dismiss, 3500);
   }
 
   function dismiss() {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setToast(t => ({ ...t, visible: false }));
+    setToast((t) => ({ ...t, visible: false }));
   }
+
+  // On anime l'entrée/sortie plutôt que d'apparaître d'un coup : un toast qui surgit
+  // sans transition passe souvent inaperçu.
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: toast.visible ? 1 : 0,
+      duration: toast.visible ? 220 : 160,
+      easing: toast.visible ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.ease),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [toast.visible]);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const palette = STYLE_BY_TYPE[toast.type];
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       <View style={{ flex: 1 }}>
         {children}
         {toast.visible && (
-          <View style={[styles.toast, toast.type === 'error' && styles.toastError]}>
-            <Ionicons
-              name={toast.type === 'success' ? 'checkmark-circle' : 'close-circle'}
-              size={18}
-              color="#fff"
-              style={styles.icon}
-            />
-            <Text style={styles.message} numberOfLines={2}>{toast.message}</Text>
-            <TouchableOpacity onPress={dismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={16} color="rgba(255,255,255,0.8)" />
-            </TouchableOpacity>
+          // en haut : le bas de l'écran est déjà pris par le mini-player et les FAB
+          <View style={[styles.wrap, { top: insets.top + spacing.md }]}>
+            <Animated.View
+              style={[
+                styles.toast,
+                { backgroundColor: palette.bg },
+                {
+                  opacity: anim,
+                  transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] }) }],
+                },
+              ]}
+            >
+              <Ionicons name={palette.icon} size={18} color={palette.fg} />
+              <Text style={[styles.message, { color: palette.fg }]} numberOfLines={3}>{toast.message}</Text>
+              <Pressable onPress={dismiss} hitSlop={10} style={{ cursor: 'pointer' }}>
+                <Ionicons name="close" size={16} color={palette.fg} />
+              </Pressable>
+            </Animated.View>
           </View>
         )}
       </View>
@@ -59,35 +91,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  toast: {
+  wrap: {
     position: 'absolute',
-    bottom: 32,
-    right: 16,
-    maxWidth: 300,
-    backgroundColor: '#1DB954',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
+    left: spacing.md,
+    right: spacing.md,
     alignItems: 'center',
     zIndex: 999,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    // box-none : le toast ne doit pas bloquer les clics sur l'écran en dessous
+    pointerEvents: 'box-none',
   },
-  toastError: {
-    backgroundColor: '#f87171',
+  toast: {
+    width: '100%',
+    maxWidth: layout.maxWidthNarrow,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.md,
+    ...shadows.floating,
   },
-  icon: {
-    marginRight: 8,
-  },
-  message: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    marginRight: 8,
-  },
+  message: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
 });

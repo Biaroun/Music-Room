@@ -1,10 +1,13 @@
 // mobile/src/screens/PlaylistEditorScreen.tsx
 // Charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { colors, typography, spacing } from '../config/theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, layout, radius, shadows, spacing, typography } from '../config/theme';
+import { useBottomInset } from '../components/Screen';
+import PressableCard from '../components/PressableCard';
+import EmptyState from '../components/EmptyState';
 import { getTrackBpm } from '../lib/deezer';
 import type { DeezerTrack } from '../lib/deezerTypes';
 import { usePreviewPlayer, type PreviewTrack } from '../context/PreviewPlayerContext';
@@ -39,6 +42,7 @@ export default function PlaylistEditorScreen({ route }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
   const { activeTrack, isPlaying, toggle } = usePreviewPlayer();
+  const bottomInset = useBottomInset();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -137,67 +141,108 @@ export default function PlaylistEditorScreen({ route }: any) {
   const wholePlaylistPlaying = tracks.length > 0 && activeTrack?.id === String(tracks[0].id) && isPlaying;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
-      {/* Spotify-style header */}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: bottomInset + spacing.xl }}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* En-tête façon Spotify : dégradé pleine largeur, contenu borné comme le reste de l'app */}
       <LinearGradient colors={['#2f6b4f', '#1d3f30', colors.background]} style={styles.header}>
-        <LinearGradient
-          colors={['#1DB954', '#0b2e22']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.cover}
-        >
-          <Ionicons name="musical-note" size={64} color={colors.textPrimary} />
-        </LinearGradient>
+        <View style={styles.column}>
+          <LinearGradient
+            colors={['#1DB954', '#0b2e22']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cover}
+          >
+            <Ionicons name="musical-note" size={64} color={colors.textPrimary} />
+          </LinearGradient>
 
-        <TextInput
-          style={styles.titleInput}
-          value={name}
-          onChangeText={setName}
-          onBlur={saveName}
-          placeholder="Playlist name"
-          placeholderTextColor={colors.textSecondary}
-        />
+          <TextInput
+            style={styles.titleInput}
+            value={name}
+            onChangeText={setName}
+            onBlur={saveName}
+            placeholder="Playlist name"
+            placeholderTextColor={colors.textSecondary}
+            selectTextOnFocus
+          />
 
-        <View style={styles.metaRow}>
-          <Text style={styles.meta}>You</Text>
-          <Text style={styles.dot}>•</Text>
-          <TouchableOpacity onPress={toggleVisibility}>
-            <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.dot}>•</Text>
-          <Text style={styles.meta}>{tracks.length} songs</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta}>You</Text>
+            <Text style={styles.dot}>•</Text>
+            <PressableCard
+              onPress={toggleVisibility}
+              style={styles.visToggle}
+              hoverStyle={styles.visToggleHover}
+              accessibilityLabel="Toggle playlist visibility"
+            >
+              <Ionicons name={isPublic ? 'earth' : 'lock-closed'} size={12} color={colors.textSecondary} />
+              <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
+            </PressableCard>
+            <Text style={styles.dot}>•</Text>
+            <Text style={styles.meta}>{tracks.length} {tracks.length === 1 ? 'song' : 'songs'}</Text>
+          </View>
+
+          <PressableCard
+            style={[styles.playFab, tracks.length === 0 && styles.playFabOff]}
+            hoverStyle={styles.playFabHover}
+            onPress={playAll}
+            disabled={tracks.length === 0}
+            accessibilityLabel="Play playlist"
+          >
+            <Ionicons name={wholePlaylistPlaying ? 'pause' : 'play'} size={22} color={colors.onAccent} />
+          </PressableCard>
         </View>
-
-        <TouchableOpacity style={styles.playFab} activeOpacity={0.85} onPress={playAll} disabled={tracks.length === 0}>
-          <Ionicons name={wholePlaylistPlaying ? 'pause' : 'play'} size={22} color="#000" />
-        </TouchableOpacity>
       </LinearGradient>
 
       {/* Track list */}
-      <View style={styles.body}>
-        {tracks.map((tk, i) => (
-          <View key={tk.id} style={styles.row}>
-            <Text style={styles.index}>{i + 1}</Text>
-            <View style={styles.art}>
-              {tk.cover ? (
-                <Image source={{ uri: tk.cover }} style={styles.artImg} />
-              ) : (
-                <Text style={styles.artText}>{tk.title[0]?.toUpperCase() ?? '?'}</Text>
-              )}
-            </View>
-            <View style={styles.trackInfo}>
-              <Text style={styles.trackTitle} numberOfLines={1}>{tk.title}</Text>
-              <Text style={styles.trackArtist} numberOfLines={1}>{tk.artist}</Text>
-            </View>
-            <TouchableOpacity onPress={() => toggle(toPreviewTrack(tk))} style={styles.ctrl}>
-              <Ionicons name={activeTrack?.id === String(tk.id) && isPlaying ? 'pause' : 'play'} size={16} color={colors.accent} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => move(i, -1)} style={styles.ctrl}><Ionicons name="chevron-up" size={16} color={colors.textSecondary} /></TouchableOpacity>
-            <TouchableOpacity onPress={() => move(i, 1)} style={styles.ctrl}><Ionicons name="chevron-down" size={16} color={colors.textSecondary} /></TouchableOpacity>
-            <TouchableOpacity onPress={() => removeTrack(tk.id)} style={styles.ctrl}><Ionicons name="close" size={16} color="#f87171" /></TouchableOpacity>
-          </View>
-        ))}
-        {tracks.length === 0 && <Text style={styles.empty}>No tracks yet. Add the first one below.</Text>}
+      <View style={[styles.column, styles.body]}>
+        {tracks.map((tk, i) => {
+          const isCurrent = activeTrack?.id === String(tk.id);
+          return (
+            <PressableCard
+              key={tk.id}
+              style={[styles.row, isCurrent && styles.rowActive]}
+              hoverStyle={styles.rowHover}
+              onPress={() => toggle(toPreviewTrack(tk))}
+            >
+              <Text style={[styles.index, isCurrent && { color: colors.accent }]}>{i + 1}</Text>
+              <View style={styles.art}>
+                {tk.cover ? (
+                  <Image source={{ uri: tk.cover }} style={styles.artImg} />
+                ) : (
+                  <Text style={styles.artText}>{tk.title[0]?.toUpperCase() ?? '?'}</Text>
+                )}
+              </View>
+              <View style={styles.trackInfo}>
+                <Text style={[styles.trackTitle, isCurrent && { color: colors.accent }]} numberOfLines={1}>{tk.title}</Text>
+                <Text style={styles.trackArtist} numberOfLines={1}>{tk.artist}</Text>
+              </View>
+              <Pressable onPress={() => toggle(toPreviewTrack(tk))} hitSlop={6} style={styles.ctrl} accessibilityLabel="Play track">
+                <Ionicons name={isCurrent && isPlaying ? 'pause' : 'play'} size={16} color={colors.accent} />
+              </Pressable>
+              <Pressable onPress={() => move(i, -1)} disabled={i === 0} hitSlop={6} style={styles.ctrl} accessibilityLabel="Move up">
+                <Ionicons name="chevron-up" size={16} color={i === 0 ? colors.textTertiary : colors.textSecondary} />
+              </Pressable>
+              <Pressable onPress={() => move(i, 1)} disabled={i === tracks.length - 1} hitSlop={6} style={styles.ctrl} accessibilityLabel="Move down">
+                <Ionicons name="chevron-down" size={16} color={i === tracks.length - 1 ? colors.textTertiary : colors.textSecondary} />
+              </Pressable>
+              <Pressable onPress={() => removeTrack(tk.id)} hitSlop={6} style={styles.ctrl} accessibilityLabel="Remove track">
+                <Ionicons name="close" size={16} color={colors.danger} />
+              </Pressable>
+            </PressableCard>
+          );
+        })}
+
+        {tracks.length === 0 && (
+          <EmptyState
+            icon="disc-outline"
+            title="No tracks yet"
+            message="Search Deezer below to add the first track to this playlist."
+          />
+        )}
 
         {/* Add a track */}
         <Text style={styles.addTitle}>Add a track</Text>
@@ -212,35 +257,53 @@ const FAB = 56;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  column: { width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
 
-  header: { paddingTop: spacing.xl, paddingHorizontal: spacing.md, paddingBottom: spacing.xl + FAB / 2 },
+  header: { paddingTop: spacing.xl, paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
   cover: {
-    width: COVER, height: COVER, borderRadius: 6, alignSelf: 'center',
+    width: COVER, height: COVER, borderRadius: radius.md, alignSelf: 'center',
     alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg,
-    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 12 }, elevation: 12,
+    ...shadows.floating,
   },
-  titleInput: { fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.5, padding: 0 },
+  titleInput: {
+    fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.8,
+    padding: 0, outlineWidth: 0,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
   meta: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   dot: { color: colors.textSecondary, fontSize: 13, marginHorizontal: spacing.xs },
+  visToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    paddingVertical: 3, paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
+  },
+  visToggleHover: { backgroundColor: 'rgba(255,255,255,0.08)' },
   playFab: {
-    position: 'absolute', right: spacing.md, bottom: -FAB / 2,
+    position: 'absolute', right: 0, bottom: -(FAB / 2 + spacing.xl),
     width: FAB, height: FAB, borderRadius: FAB / 2, backgroundColor: colors.accent,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+    ...shadows.floating,
   },
+  playFabHover: { backgroundColor: colors.accentHover },
+  playFabOff: { opacity: 0.45 },
 
-  body: { paddingHorizontal: spacing.md, paddingTop: spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
+  // paddingTop laisse passer la moitié du bouton play qui déborde de l'en-tête
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.xs },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  rowHover: { backgroundColor: colors.surfaceAlt },
+  rowActive: { backgroundColor: colors.accentSoft },
   index: { width: 22, textAlign: 'center', color: colors.textSecondary, fontSize: 14, fontVariant: ['tabular-nums'] },
-  art: { width: 44, height: 44, borderRadius: 4, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm, marginRight: spacing.md, overflow: 'hidden' },
+  art: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm, marginRight: spacing.md, overflow: 'hidden' },
   artImg: { width: '100%', height: '100%' },
   artText: { color: colors.textSecondary, fontSize: 18, fontWeight: '800' },
   trackInfo: { flex: 1, marginRight: spacing.sm },
   trackTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
   trackArtist: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  ctrl: { paddingHorizontal: 6, paddingVertical: spacing.xs },
-  empty: { color: colors.textSecondary, fontSize: 14, paddingVertical: spacing.md },
+  ctrl: { paddingHorizontal: 6, paddingVertical: spacing.xs, cursor: 'pointer' },
 
-  addTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: spacing.xl, marginBottom: spacing.md },
+  addTitle: { ...typography.h2, marginTop: spacing.xl, marginBottom: spacing.md },
 });

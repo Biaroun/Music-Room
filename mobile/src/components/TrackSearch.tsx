@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing } from "../config/theme";
+import { View, Text, TextInput, Pressable, StyleSheet, Image, ActivityIndicator } from "react-native";
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, radius, spacing } from "../config/theme";
 import { useDeezerSearch } from "../lib/useDeezerSearch";
 import type { DeezerTrack } from "../lib/deezerTypes";
 import { useToast } from "./Toast";
 import { usePreviewPlayer, type PreviewTrack } from "../context/PreviewPlayerContext";
+import PressableCard from "./PressableCard";
 
 type TrackSearchProps = {
   onSelect?: (track: DeezerTrack) => void;
@@ -31,6 +32,7 @@ export default function TrackSearch({
   const { showToast } = useToast();
   const { activeTrack, isPlaying, toggle } = usePreviewPlayer();
   const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
   const { results, loading, error } = useDeezerSearch(query);
 
   useEffect(() => {
@@ -51,77 +53,73 @@ export default function TrackSearch({
 
   return (
     <View>
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, focused && styles.searchRowFocused]}>
+        <Ionicons name="search" size={17} color={focused ? colors.accent : colors.textSecondary} />
         <TextInput
           style={styles.input}
           value={query}
           onChangeText={setQuery}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textTertiary}
+          returnKeyType="search"
         />
-        {loading && (
-          <ActivityIndicator
-            size="small"
-            color={colors.textSecondary}
-            style={styles.spinner}
-          />
+        {loading && <ActivityIndicator size="small" color={colors.textSecondary} />}
+        {!loading && query.length > 0 && (
+          <Pressable onPress={() => setQuery("")} hitSlop={8} style={{ cursor: "pointer" }} accessibilityLabel="Clear search">
+            <Ionicons name="close-circle" size={17} color={colors.textSecondary} />
+          </Pressable>
         )}
       </View>
 
       {query.trim().length > 0 && (
-        <View>
-          {results.map((r) => (
-            <TouchableOpacity
-              key={r.id}
-              style={styles.row}
-              onPress={() => pressRow(r)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.art}>
-                {r.cover ? (
-                  <Image source={{ uri: r.cover }} style={styles.artImg} />
-                ) : (
-                  <Text style={styles.artText}>
-                    {r.title[0]?.toUpperCase() ?? "?"}
+        <View style={styles.results}>
+          {results.map((r) => {
+            const isCurrent = activeTrack?.id === r.id;
+            return (
+              <PressableCard
+                key={r.id}
+                style={[styles.row, isCurrent && styles.rowActive]}
+                hoverStyle={styles.rowHover}
+                onPress={() => pressRow(r)}
+                accessibilityLabel={`${r.title} — ${r.artist}`}
+              >
+                <View style={styles.art}>
+                  {r.cover ? (
+                    <Image source={{ uri: r.cover }} style={styles.artImg} />
+                  ) : (
+                    <Text style={styles.artText}>{r.title[0]?.toUpperCase() ?? "?"}</Text>
+                  )}
+                </View>
+                <View style={styles.info}>
+                  <Text style={[styles.title, isCurrent && { color: colors.accent }]} numberOfLines={1}>
+                    {r.title}
                   </Text>
+                  <Text style={styles.artist} numberOfLines={1}>{r.artist}</Text>
+                </View>
+                {r.previewUrl ? (
+                  <Pressable
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      toggle(toPreviewTrack(r), playableQueue);
+                    }}
+                    hitSlop={6}
+                    style={styles.ctrl}
+                    accessibilityLabel="Preview track"
+                  >
+                    <Ionicons name={isCurrent && isPlaying ? "pause" : "play"} size={16} color={colors.accent} />
+                  </Pressable>
+                ) : (
+                  // Deezer ne fournit pas toujours l'extrait de 30s
+                  <Text style={styles.noPreview}>No preview</Text>
                 )}
-              </View>
-              <View style={styles.info}>
-                <Text style={styles.title} numberOfLines={1}>
-                  {r.title}
-                </Text>
-                <Text style={styles.artist} numberOfLines={1}>
-                  {r.artist}
-                </Text>
-              </View>
-              {r.previewUrl && (
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    toggle(toPreviewTrack(r), playableQueue);
-                  }}
-                  style={styles.ctrl}
-                >
-                  <Ionicons
-                    name={
-                      activeTrack?.id === r.id && isPlaying ? "pause" : "play"
-                    }
-                    size={16}
-                    color={colors.accent}
-                  />
-                </TouchableOpacity>
-              )}
-              {onSelect && (
-                <Ionicons
-                  name="add-circle-outline"
-                  size={22}
-                  color={colors.accent}
-                />
-              )}
-            </TouchableOpacity>
-          ))}
+                {onSelect && <Ionicons name="add-circle" size={22} color={colors.accent} />}
+              </PressableCard>
+            );
+          })}
           {!loading && !error && results.length === 0 && (
-            <Text style={styles.empty}>No results</Text>
+            <Text style={styles.empty}>No results for “{query.trim()}”</Text>
           )}
         </View>
       )}
@@ -133,42 +131,50 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    height: 46,
   },
+  searchRowFocused: { borderColor: colors.accent },
   input: {
     flex: 1,
-    backgroundColor: colors.surface,
     color: colors.textPrimary,
-    borderRadius: 6,
-    padding: spacing.md,
-    fontSize: 14,
+    fontSize: 15,
+    height: "100%",
+    outlineWidth: 0,
   },
-  spinner: { marginLeft: spacing.sm },
 
+  results: { marginTop: spacing.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: spacing.xs,
+    gap: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.sm,
   },
+  rowHover: { backgroundColor: colors.surface },
+  rowActive: { backgroundColor: colors.accentSoft },
   art: {
     width: 44,
     height: 44,
-    borderRadius: 4,
+    borderRadius: radius.sm,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: spacing.md,
+    marginRight: spacing.xs,
     overflow: "hidden",
   },
   artImg: { width: "100%", height: "100%" },
   artText: { color: colors.textSecondary, fontSize: 18, fontWeight: "800" },
-  info: { flex: 1, marginRight: spacing.sm },
+  info: { flex: 1 },
   title: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
   artist: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
-  ctrl: { paddingHorizontal: 6, paddingVertical: spacing.xs },
-  empty: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    paddingVertical: spacing.md,
-  },
+  ctrl: { paddingHorizontal: 6, paddingVertical: spacing.xs, cursor: "pointer" },
+  noPreview: { color: colors.textTertiary, fontSize: 11, fontStyle: "italic" },
+  empty: { color: colors.textSecondary, fontSize: 13, paddingVertical: spacing.md, textAlign: "center" },
 });

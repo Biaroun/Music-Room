@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { storage } from '../config/storage';
+import { useRealtime } from './RealtimeContext';
 
 export type PreviewTrack = {
   id: string;
@@ -252,11 +253,28 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     setActiveTrack(null);
   }
 
+  // On déclare au backend ce qu'on écoute, pour que nos amis le voient sur l'écran
+  // Amis. Une pause compte comme "plus rien en cours" : c'est ce que l'écran affiche.
+  const { reportListening } = useRealtime();
+  const isPlaying = frontStatus.playing;
+  useEffect(() => {
+    if (activeTrack && isPlaying) {
+      reportListening({
+        deezerId: activeTrack.id,
+        title: activeTrack.title,
+        artist: activeTrack.artist,
+        cover: activeTrack.cover ?? undefined,
+      });
+    } else {
+      reportListening(null);
+    }
+  }, [activeTrack?.id, isPlaying, reportListening]);
+
   return (
     <PreviewPlayerContext.Provider
       value={{
         activeTrack,
-        isPlaying: frontStatus.playing,
+        isPlaying,
         currentTime: frontStatus.currentTime,
         duration: frontStatus.duration,
         hasNext,

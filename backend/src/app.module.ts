@@ -11,6 +11,7 @@ import { MusicDelegationModule } from './music-delegation/music-delegation.modul
 import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
 import { FriendshipModule } from './friendship/friendship.module';
+import { ListeningModule } from './listening/listening.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { FriendshipModule } from './friendship/friendship.module';
     LogsModule,
     MailModule,
     FriendshipModule,
+    ListeningModule,
   ],
 })
 export class AppModule {}
