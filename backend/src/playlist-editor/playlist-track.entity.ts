@@ -38,4 +38,10 @@ export class PlaylistTrack {
 
     @CreateDateColumn()
     addedAt: Date;
+
+    // Usage track-vote uniquement : marque un morceau comme deja joue dans la
+    // file d'attente d'un event, pour qu'il sorte du classement votable et ne
+    // repasse jamais. Reste null pour l'usage playlist-editor classique.
+    @Column({ type: 'timestamp', nullable: true })
+    playedAt: Date | null;
 }

@@ -21,6 +21,7 @@ import EditProfileScreen from './src/screens/EditProfileScreen';
 import PlaylistsScreen from './src/screens/PlaylistsScreen';
 import PlaylistEditorScreen from './src/screens/PlaylistEditorScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
+import EventsScreen from './src/screens/EventsScreen';
 import TrackVoteScreen from './src/screens/TrackVoteScreen';
 import MusicDelegationScreen from './src/screens/MusicDelegationScreen';
 
@@ -80,6 +81,7 @@ function Navigation() {
           <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }}/>
           <Stack.Screen name="Playlists" component={PlaylistsScreen} options={{ title: 'My Playlists' }} />
           <Stack.Screen name="PlaylistEditor" component={PlaylistEditorScreen} options={{ title: 'Playlist' }} />
+          <Stack.Screen name="Events" component={EventsScreen} options={{ title: 'Events' }} />
           <Stack.Screen name="TrackVote" component={TrackVoteScreen} options={{ title: 'Track Vote' }} />
           <Stack.Screen name="MusicDelegation" component={MusicDelegationScreen} options={{ title: 'Music Delegation' }} />
         </>

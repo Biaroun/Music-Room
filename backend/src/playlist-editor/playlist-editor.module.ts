@@ -8,6 +8,7 @@ import { PlaylistTrack } from './playlist-track.entity';
 @Module({
   imports: [TypeOrmModule.forFeature([Playlist, PlaylistTrack])],
   controllers: [PlaylistEditorController],
-  providers: [PlaylistEditorService]
+  providers: [PlaylistEditorService],
+  exports: [PlaylistEditorService],
 })
 export class PlaylistEditorModule {}

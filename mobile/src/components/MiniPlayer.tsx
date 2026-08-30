@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, Image, useWindowDimensions } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, Text, Pressable, StyleSheet, Image, PanResponder, useWindowDimensions } from "react-native";
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radius, spacing } from "../config/theme";
@@ -45,6 +45,51 @@ function IconButton({
   );
 }
 
+// PanResponder + measure() plutot que locationX de Pressable : locationX n'est
+// pas fiable sur react-native-web (peut remonter NaN), alors que gestureState
+// donne toujours des coordonnees page valides. Bonus : ca permet le glisser,
+// pas juste le tap.
+function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
+  const trackRef = useRef<View>(null);
+  const layoutRef = useRef({ pageX: 0, width: 1 });
+
+  function updateFromPageX(pageX: number) {
+    const { pageX: trackX, width } = layoutRef.current;
+    if (width <= 0) return;
+    onChange((pageX - trackX) / width);
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (_e, gesture) => updateFromPageX(gesture.x0),
+      onPanResponderMove: (_e, gesture) => updateFromPageX(gesture.moveX),
+    }),
+  ).current;
+
+  function measureTrack() {
+    trackRef.current?.measure((_x, _y, width, _height, pageX) => {
+      if (Number.isFinite(pageX) && Number.isFinite(width) && width > 0) {
+        layoutRef.current = { pageX, width };
+      }
+    });
+  }
+
+  return (
+    <View
+      ref={trackRef}
+      style={styles.volumeTrack}
+      onLayout={measureTrack}
+      {...panResponder.panHandlers}
+    >
+      <View style={styles.volumeBase} />
+      <View style={[styles.volumeFill, { width: `${volume * 100}%` }]} />
+      <View style={[styles.volumeThumb, { left: `${volume * 100}%` }]} />
+    </View>
+  );
+}
+
 export default function MiniPlayer() {
   const {
     activeTrack,
@@ -55,6 +100,8 @@ export default function MiniPlayer() {
     hasPrevious,
     transitionsEnabled,
     setTransitionsEnabled,
+    volume,
+    setVolume,
     toggle,
     next,
     previous,
@@ -119,6 +166,19 @@ export default function MiniPlayer() {
         <IconButton onPress={next} disabled={!hasNext} label="Next track">
           <Ionicons name="play-skip-forward" size={20} color={hasNext ? colors.textPrimary : colors.textTertiary} />
         </IconButton>
+
+        <View style={styles.volumeGroup}>
+          <IconButton onPress={() => setVolume(volume > 0 ? 0 : 1)} label={volume > 0 ? "Mute" : "Unmute"}>
+            <Ionicons
+              name={volume === 0 ? "volume-mute" : volume < 0.5 ? "volume-low" : "volume-high"}
+              size={20}
+              color={colors.textSecondary}
+            />
+          </IconButton>
+          {/* la barre glissable prend de la place : sur telephone on garde juste le bouton mute */}
+          {showTime && <VolumeSlider volume={volume} onChange={setVolume} />}
+        </View>
+
         <IconButton onPress={stop} label="Close player">
           <Ionicons name="close" size={20} color={colors.textSecondary} />
         </IconButton>
@@ -184,5 +244,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
+  },
+  volumeGroup: { flexDirection: "row", alignItems: "center" },
+  volumeTrack: { width: 70, height: 24, justifyContent: "center", cursor: "pointer" },
+  volumeBase: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+  },
+  volumeFill: {
+    position: "absolute",
+    left: 0,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.accent,
+  },
+  volumeThumb: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.accent,
+    marginLeft: -6,
   },
 });
