@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { io, type Socket } from 'socket.io-client';
 import { API_URL, apiFetch } from '../config/api';
 import { useAuth } from './AuthContext';
+import { useToast } from '../components/Toast';
 
 export type FriendListening = {
     userId: number;
@@ -21,6 +22,33 @@ export type ListeningReport = {
     cover?: string;
 };
 
+export type VoteBoardTrack = {
+    trackId: number;
+    deezerId: string;
+    title: string;
+    artist: string;
+    cover: string | null;
+    voteCount: number;
+    myVote: boolean;
+};
+
+export type VoteNowPlaying = {
+    trackId: number;
+    deezerId: string;
+    title: string;
+    artist: string;
+    cover: string | null;
+    previewUrl: string;
+    startedAt: number;
+    durationMs: number;
+};
+
+export type VoteBoard = {
+    tracks: VoteBoardTrack[];
+    nowPlaying: VoteNowPlaying | null;
+    updatedAt: number;
+};
+
 type RealtimeContextType = {
     /** true quand le websocket est établi ; sinon on est en repli REST */
     connected: boolean;
@@ -28,6 +56,15 @@ type RealtimeContextType = {
     friendsListening: Record<number, FriendListening>;
     /** déclare ce que j'écoute, ou null quand je m'arrête */
     reportListening: (track: ListeningReport | null) => void;
+    /** board du dernier event rejoint (undefined tant qu'aucun snapshot n'est arrivé) */
+    voteBoard: VoteBoard | undefined;
+    /** rejoint la room de vote de cet event ; le board arrive ensuite via voteBoard */
+    joinEvent: (eventId: number) => void;
+    leaveEvent: (eventId: number) => void;
+    /** vote via le socket quand connecté ; à l'appelant de faire un repli REST sinon */
+    castVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
+    /** retire un vote pour un morceau précis (un voteur peut voter plusieurs morceaux, un seul vote par morceau) */
+    retractVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextType | null>(null);
@@ -40,9 +77,13 @@ const FALLBACK_POLL_MS = 20_000;
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
+    const { showToast } = useToast();
     const [connected, setConnected] = useState(false);
     const [friendsListening, setFriendsListening] = useState<Record<number, FriendListening>>({});
+    const [voteBoard, setVoteBoard] = useState<VoteBoard | undefined>(undefined);
     const socketRef = useRef<Socket | null>(null);
+    // rejoint automatiquement à la reconnexion si un écran de vote est ouvert
+    const joinedEventIdRef = useRef<number | null>(null);
     // dernier morceau déclaré : sert à réémettre le heartbeat et à rejouer
     // l'état après une reconnexion
     const lastReportRef = useRef<ListeningReport | null>(null);
@@ -70,6 +111,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             // on redéclare l'écoute en cours : le backend a pu perdre l'état
             // pendant la coupure
             if (lastReportRef.current) socket.emit('listening:update', lastReportRef.current);
+            // reconnexion : la room de vote n'a pas survécu à la coupure
+            if (joinedEventIdRef.current != null) socket.emit('event:join', { eventId: joinedEventIdRef.current });
         });
         socket.on('disconnect', () => setConnected(false));
         socket.on('connect_error', () => setConnected(false));
@@ -89,6 +132,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             });
         });
 
+        socket.on('vote:board', (board: VoteBoard) => setVoteBoard(board));
+        // sans ça un vote refusé cote serveur (licence/visibilite) echoue en silence :
+        // rien ne l'affichait avant, on avait juste l'evenement sans listener.
+        socket.on('vote:error', ({ message }: { message: string }) => {
+            showToast({ type: 'error', message: message || 'Vote failed' });
+        });
+
         return () => {
             socket.removeAllListeners();
             socket.disconnect();
@@ -96,6 +146,31 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             setConnected(false);
         };
     }, [token]);
+
+    const joinEvent = useCallback((eventId: number) => {
+        joinedEventIdRef.current = eventId;
+        setVoteBoard(undefined);
+        socketRef.current?.emit('event:join', { eventId });
+    }, []);
+
+    const leaveEvent = useCallback((eventId: number) => {
+        if (joinedEventIdRef.current === eventId) joinedEventIdRef.current = null;
+        socketRef.current?.emit('event:leave', { eventId });
+    }, []);
+
+    const castVoteRealtime = useCallback(
+        (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => {
+            socketRef.current?.emit('vote:cast', { eventId, trackId, ...position });
+        },
+        [],
+    );
+
+    const retractVoteRealtime = useCallback(
+        (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => {
+            socketRef.current?.emit('vote:retract', { eventId, trackId, ...position });
+        },
+        [],
+    );
 
     const reportListening = useCallback(
         (track: ListeningReport | null) => {
@@ -142,7 +217,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }, [token, connected]);
 
     return (
-        <RealtimeContext.Provider value={{ connected, friendsListening, reportListening }}>
+        <RealtimeContext.Provider
+            value={{
+                connected,
+                friendsListening,
+                reportListening,
+                voteBoard,
+                joinEvent,
+                leaveEvent,
+                castVoteRealtime,
+                retractVoteRealtime,
+            }}
+        >
             {children}
         </RealtimeContext.Provider>
     );

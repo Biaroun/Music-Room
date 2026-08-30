@@ -8,7 +8,10 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#121212",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Music Room needs your location to check you're allowed to vote in a location-restricted event."
+      }
     },
     "android": {
       "package": "com.musicroomandroid.app",
@@ -18,14 +21,21 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["ACCESS_FINE_LOCATION"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Music Room needs your location to check you're allowed to vote in a location-restricted event."
+        }
+      ]
     ]
   }
 }

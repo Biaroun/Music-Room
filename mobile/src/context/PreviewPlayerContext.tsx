@@ -22,6 +22,9 @@ type PreviewPlayerContextType = {
   hasPrevious: boolean;
   transitionsEnabled: boolean;
   setTransitionsEnabled: (enabled: boolean) => void;
+  /** 0 (muet) a 1 (plein volume), applique au morceau qui joue actuellement. */
+  volume: number;
+  setVolume: (volume: number) => void;
   toggle: (track: PreviewTrack, queue?: PreviewTrack[]) => void;
   next: () => void;
   previous: () => void;
@@ -36,6 +39,7 @@ const CROSSFADE_TICK_MS = 100;
 // au dela de 8% d'ecart ca sonne bizarre meme avec pitch correction, donc on ne force pas.
 const BPM_TOLERANCE = 0.08;
 const TRANSITIONS_SETTING_KEY = 'transitions_enabled';
+const VOLUME_SETTING_KEY = 'preview_volume';
 
 // Vitesse a appliquer au morceau qui arrive pour caler son bpm sur celui qui part.
 // 70 et 140 bpm peuvent "matcher" en half-time, donc on teste le ratio direct, x2 et /2,
@@ -58,6 +62,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   const [activeTrack, setActiveTrack] = useState<PreviewTrack | null>(null);
   const [frontKey, setFrontKey] = useState<'A' | 'B'>('A');
   const [transitionsEnabled, setTransitionsEnabledState] = useState(true);
+  const [volume, setVolumeState] = useState(1);
 
   const queueRef = useRef<PreviewTrack[] | null>(null);
   // Copies "toujours a jour" du state, pour que le listener audio (branche une seule fois
@@ -65,6 +70,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   const activeTrackRef = useRef<PreviewTrack | null>(null);
   const frontKeyRef = useRef<'A' | 'B'>('A');
   const transitionsEnabledRef = useRef(true);
+  const volumeRef = useRef(1);
   const crossfadingRef = useRef(false);
   const crossfadeTriggeredForRef = useRef<string | null>(null);
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,15 +81,40 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
-    // relit le reglage sauve au demarrage (sinon on reste sur le defaut le temps que ca charge)
+    // relit les reglages sauves au demarrage (sinon on reste sur le defaut le temps que ca charge)
     storage.getItem(TRANSITIONS_SETTING_KEY).then((v) => {
       if (v != null) setTransitionsEnabledState(v === '1');
+    });
+    storage.getItem(VOLUME_SETTING_KEY).then((v) => {
+      if (v == null) return;
+      const parsed = parseFloat(v);
+      if (!Number.isNaN(parsed)) {
+        volumeRef.current = parsed;
+        setVolumeState(parsed);
+      }
     });
   }, []);
 
   function setTransitionsEnabled(enabled: boolean) {
     setTransitionsEnabledState(enabled);
     storage.setItem(TRANSITIONS_SETTING_KEY, enabled ? '1' : '0').catch(() => {});
+  }
+
+  // Applique tout de suite au deck audible (sauf pendant un fondu : le tick
+  // du fondu relit volumeRef a chaque pas, la nouvelle valeur y est prise en
+  // compte automatiquement sans a-coup).
+  function setVolume(v: number) {
+    // locationX cote web n'est pas toujours fiable (Pressable RN-Web) et peut
+    // remonter NaN : sans ce garde-fou, assigner ca a HTMLMediaElement.volume
+    // fait planter l'element audio entier.
+    if (!Number.isFinite(v)) return;
+    const clamped = Math.max(0, Math.min(1, v));
+    volumeRef.current = clamped;
+    setVolumeState(clamped);
+    storage.setItem(VOLUME_SETTING_KEY, String(clamped)).catch(() => {});
+    if (!crossfadingRef.current) {
+      getDeck(frontKeyRef.current).volume = clamped;
+    }
   }
 
   function getDeck(key: 'A' | 'B'): AudioPlayer {
@@ -102,16 +133,16 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     clearCrossfadeTimer();
     crossfadingRef.current = false;
     crossfadeTriggeredForRef.current = null;
-    getDeck(key).volume = 1;
+    getDeck(key).volume = volumeRef.current;
     const otherKey = key === 'A' ? 'B' : 'A';
     getDeck(otherKey).pause();
-    getDeck(otherKey).volume = 1;
+    getDeck(otherKey).volume = volumeRef.current;
   }
 
   // Lance un morceau depuis zero sur le deck donne (volume/vitesse remis a la normale avant).
   function playAt(track: PreviewTrack, key: 'A' | 'B') {
     const deck = getDeck(key);
-    deck.volume = 1;
+    deck.volume = volumeRef.current;
     deck.setPlaybackRate(1, 'high');
     deck.replace(track.previewUrl);
     deck.play();
@@ -159,13 +190,15 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     crossfadeTimerRef.current = setInterval(() => {
       step += 1;
       const t = Math.min(step / steps, 1);
-      outDeck.volume = 1 - t;
-      inDeck.volume = t;
+      // volumeRef relu a chaque tick : un ajustement du volume pendant un
+      // fondu s'applique immediatement, sans casser la rampe en cours.
+      outDeck.volume = (1 - t) * volumeRef.current;
+      inDeck.volume = t * volumeRef.current;
 
       if (t >= 1) {
         clearCrossfadeTimer();
         outDeck.pause();
-        outDeck.volume = 1;
+        outDeck.volume = volumeRef.current;
         outDeck.setPlaybackRate(1, 'high'); // on remet la vitesse normale pour la prochaine fois
         crossfadingRef.current = false;
         crossfadeTriggeredForRef.current = null;
@@ -281,6 +314,8 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
         hasPrevious,
         transitionsEnabled,
         setTransitionsEnabled,
+        volume,
+        setVolume,
         toggle,
         next,
         previous,
