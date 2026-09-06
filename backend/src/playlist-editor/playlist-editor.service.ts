@@ -1,8 +1,10 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Playlist } from './playlist.entity';
 import { PlaylistTrack } from './playlist-track.entity';
+import { PlaylistCollaborator } from './playlist-collaborator.entity';
+import { User } from '../users/user.entity';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddTrackDto } from './dto/add-track.dto';
@@ -12,6 +14,8 @@ export class PlaylistEditorService {
     constructor(
         @InjectRepository(Playlist) private playlists: Repository<Playlist>,
         @InjectRepository(PlaylistTrack) private tracks: Repository<PlaylistTrack>,
+        @InjectRepository(PlaylistCollaborator) private collaborators: Repository<PlaylistCollaborator>,
+        @InjectRepository(User) private users: Repository<User>,
     ) {}
 
     async create(ownerId: number, dto: CreatePlaylistDto) {
@@ -49,14 +53,44 @@ export class PlaylistEditorService {
     }
 
     private async findOwned(id: number, ownerId: number): Promise<Playlist> {
+        const playlist = await this.load(id);
+        if (playlist.owner.id !== ownerId) throw new ForbiddenException('Not your playlist');
+        return playlist;
+    }
+
+    private isCollaborator(playlistId: number, userId: number): Promise<boolean> {
+        return this.collaborators
+            .findOne({ where: { playlist: { id: playlistId }, collaborator: { id: userId } } })
+            .then((row) => !!row);
+    }
+
+    // select restreint sur owner : sinon TypeORM renvoie tout l'entity User avec
+    // ses relations, tokens de reset/verif compris.
+    private async load(id: number): Promise<Playlist> {
         const playlist = await this.playlists.findOne({
             where: { id },
             relations: { owner: true },
             select: { owner: { id: true, username: true } },
         });
         if (!playlist) throw new NotFoundException('Playlist not found');
-        if (playlist.owner.id !== ownerId) throw new ForbiddenException('Not your playlist');
         return playlist;
+    }
+
+    /** Droit d'ecriture sur le contenu : proprietaire ou collaborateur invite. */
+    async assertCanEdit(playlistId: number, userId: number): Promise<Playlist> {
+        const playlist = await this.load(playlistId);
+        if (playlist.owner.id === userId) return playlist;
+        if (await this.isCollaborator(playlistId, userId)) return playlist;
+        throw new ForbiddenException('You are not an editor of this playlist');
+    }
+
+    /** Droit de lecture : playlist publique, proprietaire, ou collaborateur. */
+    async assertCanView(playlistId: number, userId: number): Promise<Playlist> {
+        const playlist = await this.load(playlistId);
+        if (playlist.isPublic) return playlist;
+        if (playlist.owner.id === userId) return playlist;
+        if (await this.isCollaborator(playlistId, userId)) return playlist;
+        throw new ForbiddenException('This playlist is private');
     }
 
     async update(id: number, ownerId: number, dto: UpdatePlaylistDto) {

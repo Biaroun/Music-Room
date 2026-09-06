@@ -13,6 +13,12 @@ export class Playlist {
     @Column({ default: true })
     isPublic: boolean;
 
+    // Incremente a la main par chaque mutation de contenu. @VersionColumn ne
+    // conviendrait pas : add/removeTrack sauvegardent un PlaylistTrack, jamais
+    // la Playlist, donc la version ne bougerait pas.
+    @Column({ type: 'int', default: 0 })
+    version: number;
+
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     @JoinColumn()
     owner: User;
