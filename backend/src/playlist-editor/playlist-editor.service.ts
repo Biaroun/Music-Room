@@ -9,6 +9,20 @@ import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddTrackDto } from './dto/add-track.dto';
 
+export type CollaboratorSummary = { id: number; username: string; avatar: string | null };
+
+/** Etat complet diffuse a la room par PlaylistEditorGateway. */
+export type PlaylistState = {
+    id: number;
+    name: string;
+    isPublic: boolean;
+    version: number;
+    owner: { id: number; username: string };
+    collaborators: CollaboratorSummary[];
+    tracks: PlaylistTrack[];
+    updatedAt: number;
+};
+
 @Injectable()
 export class PlaylistEditorService {
     constructor(
@@ -27,29 +41,45 @@ export class PlaylistEditorService {
         return this.playlists.save(playlist);
     }
 
-    findMine(ownerId: number) {
+    async findMine(userId: number) {
         // tracks charge juste pour le compteur affiche dans la liste cote mobile
-        return this.playlists.find({
-            where: { owner: { id: ownerId } },
+        const owned = await this.playlists.find({
+            where: { owner: { id: userId } },
             relations: { tracks: true },
             order: { createdAt: 'DESC' },
         });
+
+        const rows = await this.collaborators.find({
+            where: { collaborator: { id: userId } },
+            relations: { playlist: true },
+        });
+        const sharedIds = rows.map((row) => row.playlist.id);
+        const shared = sharedIds.length
+            ? await this.playlists.find({
+                  where: { id: In(sharedIds) },
+                  relations: { tracks: true, owner: true },
+                  select: { owner: { id: true, username: true } },
+                  order: { createdAt: 'DESC' },
+              })
+            : [];
+
+        // isOwner : le mobile masque renommage / visibilite / suppression dessus
+        return [
+            ...owned.map((playlist) => ({ ...playlist, isOwner: true })),
+            ...shared.map((playlist) => ({ ...playlist, isOwner: false })),
+        ];
     }
 
     async findOne(id: number, requesterId: number) {
-        // select restreint sur owner : sinon TypeORM renvoie tout l'entity User avec les
-        // relations, tokens de reset/verif compris.
+        await this.assertCanView(id, requesterId);
         const playlist = await this.playlists.findOne({
             where: { id },
             relations: { owner: true, tracks: true },
             select: { owner: { id: true, username: true } },
         });
         if (!playlist) throw new NotFoundException('Playlist not found');
-        if (!playlist.isPublic && playlist.owner.id !== requesterId) {
-            throw new ForbiddenException('This playlist is private');
-        }
         playlist.tracks.sort((a, b) => a.position - b.position);
-        return playlist;
+        return { ...playlist, isOwner: playlist.owner.id === requesterId };
     }
 
     private async findOwned(id: number, ownerId: number): Promise<Playlist> {
@@ -104,33 +134,131 @@ export class PlaylistEditorService {
         await this.playlists.remove(playlist);
     }
 
-    async addTrack(playlistId: number, ownerId: number, dto: AddTrackDto) {
-        const playlist = await this.findOwned(playlistId, ownerId);
+    /**
+     * Etat diffuse a toute la room par le gateway. Identique pour tous les
+     * spectateurs (contrairement au board de track-vote qui porte un myVote par
+     * utilisateur), donc calcule une seule fois par diffusion.
+     */
+    async getState(playlistId: number): Promise<PlaylistState> {
+        const playlist = await this.playlists.findOne({
+            where: { id: playlistId },
+            relations: { owner: true, tracks: true },
+            select: { owner: { id: true, username: true } },
+        });
+        if (!playlist) throw new NotFoundException('Playlist not found');
+        playlist.tracks.sort((a, b) => a.position - b.position);
+
+        return {
+            id: playlist.id,
+            name: playlist.name,
+            isPublic: playlist.isPublic,
+            version: playlist.version,
+            owner: { id: playlist.owner.id, username: playlist.owner.username },
+            collaborators: await this.collaboratorSummaries(playlistId),
+            tracks: playlist.tracks,
+            updatedAt: Date.now(),
+        };
+    }
+
+    private async collaboratorSummaries(playlistId: number): Promise<CollaboratorSummary[]> {
+        const rows = await this.collaborators.find({
+            where: { playlist: { id: playlistId } },
+            relations: { collaborator: true },
+            select: { collaborator: { id: true, username: true, avatar: true } },
+        });
+        return rows.map((row) => ({
+            id: row.collaborator.id,
+            username: row.collaborator.username,
+            avatar: row.collaborator.avatar ?? null,
+        }));
+    }
+
+    async listCollaborators(playlistId: number, userId: number): Promise<CollaboratorSummary[]> {
+        await this.assertCanView(playlistId, userId);
+        return this.collaboratorSummaries(playlistId);
+    }
+
+    async addCollaborator(playlistId: number, ownerId: number, userId: number) {
+        await this.findOwned(playlistId, ownerId);
+        if (userId === ownerId) throw new BadRequestException('The owner is already an editor');
+
+        const user = await this.users.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        // idempotent : reinviter quelqu'un ne doit pas casser, la contrainte
+        // @Unique est la pour la base, pas pour l'appelant
+        const existing = await this.collaborators.findOne({
+            where: { playlist: { id: playlistId }, collaborator: { id: userId } },
+        });
+        if (existing) return existing;
+
+        return this.collaborators.save(
+            this.collaborators.create({
+                playlist: { id: playlistId } as any,
+                collaborator: { id: userId } as any,
+            }),
+        );
+    }
+
+    async removeCollaborator(playlistId: number, ownerId: number, userId: number): Promise<void> {
+        await this.findOwned(playlistId, ownerId);
+        await this.collaborators.delete({ playlist: { id: playlistId }, collaborator: { id: userId } });
+    }
+
+    private bumpVersion(playlistId: number) {
+        return this.playlists.increment({ id: playlistId }, 'version', 1);
+    }
+
+    async addTrack(playlistId: number, userId: number, dto: AddTrackDto) {
+        const playlist = await this.assertCanEdit(playlistId, userId);
         const position = await this.tracks.count({ where: { playlist: { id: playlist.id } } });
         // juste l'id pour la relation, pas besoin de renvoyer la playlist entiere dans la reponse
         const track = this.tracks.create({ ...dto, position, playlist: { id: playlist.id } as any });
-        return this.tracks.save(track);
+        const saved = await this.tracks.save(track);
+        await this.bumpVersion(playlist.id);
+        return saved;
     }
 
-    async removeTrack(playlistId: number, trackId: number, ownerId: number): Promise<void> {
-        await this.findOwned(playlistId, ownerId);
+    async removeTrack(playlistId: number, trackId: number, userId: number): Promise<void> {
+        await this.assertCanEdit(playlistId, userId);
         const track = await this.tracks.findOne({ where: { id: trackId, playlist: { id: playlistId } } });
         if (!track) throw new NotFoundException('Track not found in this playlist');
         await this.tracks.remove(track);
+        await this.bumpVersion(playlistId);
     }
 
-    async reorder(playlistId: number, ownerId: number, trackIds: number[]) {
-        await this.findOwned(playlistId, ownerId);
-        const currentTracks = await this.tracks.find({ where: { playlist: { id: playlistId } } });
+    /**
+     * expectedVersion absent = dernier ecrit gagne (compatibilite REST).
+     * Fourni, il attrape le cas que sameSet laisse passer : quelqu'un a
+     * reordonne pendant qu'on deplacait, meme jeu d'ids mais autre ordre.
+     * Le tout en transaction : un Promise.all d'updates pouvait laisser un
+     * ordre a moitie applique si une requete echouait.
+     */
+    async reorder(playlistId: number, userId: number, trackIds: number[], expectedVersion?: number) {
+        await this.assertCanEdit(playlistId, userId);
 
-        const currentIds = currentTracks.map((t) => t.id).sort((a, b) => a - b);
-        const requestedIds = [...trackIds].sort((a, b) => a - b);
-        const sameSet = currentIds.length === requestedIds.length && currentIds.every((id, i) => id === requestedIds[i]);
-        if (!sameSet) {
-            throw new ForbiddenException('trackIds must match exactly the tracks currently in the playlist');
-        }
+        await this.playlists.manager.transaction(async (em) => {
+            const playlist = await em.findOne(Playlist, { where: { id: playlistId } });
+            if (!playlist) throw new NotFoundException('Playlist not found');
+            if (expectedVersion != null && expectedVersion !== playlist.version) {
+                throw new ConflictException('Playlist changed while you were reordering');
+            }
 
-        await Promise.all(trackIds.map((trackId, index) => this.tracks.update(trackId, { position: index })));
-        return this.findOne(playlistId, ownerId);
+            const currentTracks = await em.find(PlaylistTrack, { where: { playlist: { id: playlistId } } });
+            const currentIds = currentTracks.map((t) => t.id).sort((a, b) => a - b);
+            const requestedIds = [...trackIds].sort((a, b) => a - b);
+            const sameSet =
+                currentIds.length === requestedIds.length && currentIds.every((id, i) => id === requestedIds[i]);
+            if (!sameSet) {
+                throw new ForbiddenException('trackIds must match exactly the tracks currently in the playlist');
+            }
+
+            for (const [index, trackId] of trackIds.entries()) {
+                await em.update(PlaylistTrack, trackId, { position: index });
+            }
+            await em.increment(Playlist, { id: playlistId }, 'version', 1);
+        });
+
+        return this.getState(playlistId);
     }
 }
