@@ -19,6 +19,7 @@ import { apiFetch } from '../config/api';
 import {
   type ApiPlaylistTrack,
   type PlaylistCollaborator,
+  type PlaylistLicenseMode,
   getPlaylist,
   updatePlaylist,
   addTrackToPlaylist,
@@ -59,6 +60,7 @@ export default function PlaylistEditorScreen({ route }: any) {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [licenseMode, setLicenseMode] = useState<PlaylistLicenseMode>('open');
   const [tracks, setTracks] = useState<Track[]>([]);
   // version du dernier état vu : renvoyée à chaque reorder pour que le serveur
   // refuse le nôtre si quelqu'un a réordonné entre-temps
@@ -80,6 +82,7 @@ export default function PlaylistEditorScreen({ route }: any) {
       .then(async (playlist) => {
         setName(playlist.name);
         setIsPublic(playlist.isPublic);
+        setLicenseMode(playlist.licenseMode);
         setTracks(playlist.tracks ?? []);
         setVersion(playlist.version);
         setIsOwner(playlist.isOwner ?? true);
@@ -104,6 +107,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     if (!playlistState || playlistState.id !== playlistId) return;
     setName(playlistState.name);
     setIsPublic(playlistState.isPublic);
+    setLicenseMode(playlistState.licenseMode);
     setTracks(playlistState.tracks);
     setVersion(playlistState.version);
     setCollaborators(playlistState.collaborators);
@@ -129,6 +133,16 @@ export default function PlaylistEditorScreen({ route }: any) {
     updatePlaylist(playlistId, token, { isPublic: next }).catch(() => {
       setIsPublic(!next);
       showToast({ type: 'error', message: 'Failed to update visibility' });
+    });
+  }
+
+  // Axe distinct de la visibilité : qui a le droit d'éditer, pas qui peut lire.
+  function toggleLicense() {
+    const next: PlaylistLicenseMode = licenseMode === 'open' ? 'invite-only' : 'open';
+    setLicenseMode(next);
+    updatePlaylist(playlistId, token, { licenseMode: next }).catch(() => {
+      setLicenseMode(licenseMode);
+      showToast({ type: 'error', message: 'Failed to update editing rights' });
     });
   }
 
@@ -273,6 +287,31 @@ export default function PlaylistEditorScreen({ route }: any) {
               </View>
             )}
             <Text style={styles.dot}>•</Text>
+            {isOwner ? (
+              <PressableCard
+                onPress={toggleLicense}
+                style={styles.visToggle}
+                hoverStyle={styles.visToggleHover}
+                accessibilityLabel="Toggle who can edit this playlist"
+              >
+                <Ionicons
+                  name={licenseMode === 'open' ? 'people' : 'person'}
+                  size={12}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.meta}>{licenseMode === 'open' ? 'Anyone edits' : 'Invited edit'}</Text>
+              </PressableCard>
+            ) : (
+              <View style={styles.visToggle}>
+                <Ionicons
+                  name={licenseMode === 'open' ? 'people' : 'person'}
+                  size={12}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.meta}>{licenseMode === 'open' ? 'Anyone edits' : 'Invited edit'}</Text>
+              </View>
+            )}
+            <Text style={styles.dot}>•</Text>
             <Text style={styles.meta}>{tracks.length} {tracks.length === 1 ? 'song' : 'songs'}</Text>
             {!connected && (
               <>
@@ -347,6 +386,12 @@ export default function PlaylistEditorScreen({ route }: any) {
 
         {/* Editors : seul le proprietaire donne ou retire le droit d'edition */}
         <Text style={styles.addTitle}>Editors</Text>
+        {licenseMode === 'open' && (
+          <Text style={styles.trackArtist}>
+            This playlist is open — anyone who can see it can edit it. Switch to “Invited edit” to
+            restrict it to the people below.
+          </Text>
+        )}
         {isOwner ? (
           friends.length === 0 ? (
             <Text style={styles.trackArtist}>Add friends to invite them as editors.</Text>
@@ -402,7 +447,8 @@ const styles = StyleSheet.create({
     fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.8,
     padding: 0, outlineWidth: 0,
   },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  // wrap : la ligne porte jusqu'à 5 chips (auteur, visibilité, licence, compte, offline)
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', rowGap: spacing.xs, marginTop: spacing.sm },
   meta: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   dot: { color: colors.textSecondary, fontSize: 13, marginHorizontal: spacing.xs },
   visToggle: {

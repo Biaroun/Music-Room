@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { PlaylistLicenseMode } from '../playlist.entity';
 
 export class UpdatePlaylistDto {
     @ApiProperty({ required: false })
@@ -12,4 +13,13 @@ export class UpdatePlaylistDto {
     @IsOptional()
     @IsBoolean()
     isPublic?: boolean;
+
+    @ApiProperty({
+        required: false,
+        enum: PlaylistLicenseMode,
+        description: "Qui peut editer : 'open' = tout spectateur (defaut), 'invite-only' = proprietaire et invites",
+    })
+    @IsOptional()
+    @IsEnum(PlaylistLicenseMode)
+    licenseMode?: PlaylistLicenseMode;
 }

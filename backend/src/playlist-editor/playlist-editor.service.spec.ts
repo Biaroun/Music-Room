@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PlaylistEditorService } from './playlist-editor.service';
-import { Playlist } from './playlist.entity';
+import { Playlist, PlaylistLicenseMode } from './playlist.entity';
 import { PlaylistTrack } from './playlist-track.entity';
 import { PlaylistCollaborator } from './playlist-collaborator.entity';
 import { User } from '../users/user.entity';
@@ -25,7 +25,15 @@ describe('PlaylistEditorService', () => {
   let users: { findOne: jest.Mock };
 
   const basePlaylist = (over: Partial<Playlist> = {}) =>
-    ({ id: 10, name: 'P', isPublic: true, version: 0, owner: { id: OWNER, username: 'owner' }, ...over }) as Playlist;
+    ({
+      id: 10, name: 'P', isPublic: true, version: 0,
+      licenseMode: PlaylistLicenseMode.OPEN,
+      owner: { id: OWNER, username: 'owner' },
+      ...over,
+    }) as Playlist;
+
+  const restricted = (over: Partial<Playlist> = {}) =>
+    basePlaylist({ licenseMode: PlaylistLicenseMode.INVITE_ONLY, ...over });
 
   beforeEach(async () => {
     playlists = {
@@ -58,21 +66,21 @@ describe('PlaylistEditorService', () => {
 
   describe('assertCanEdit', () => {
     it('lets the owner through without looking up collaborators', async () => {
-      playlists.findOne.mockResolvedValue(basePlaylist());
+      playlists.findOne.mockResolvedValue(restricted());
 
       await expect(service.assertCanEdit(10, OWNER)).resolves.toMatchObject({ id: 10 });
       expect(collaborators.findOne).not.toHaveBeenCalled();
     });
 
-    it('lets an invited collaborator through', async () => {
-      playlists.findOne.mockResolvedValue(basePlaylist());
+    it('lets an invited collaborator through when the license is invite-only', async () => {
+      playlists.findOne.mockResolvedValue(restricted());
       collaborators.findOne.mockResolvedValue({ id: 99 });
 
       await expect(service.assertCanEdit(10, COLLABORATOR)).resolves.toMatchObject({ id: 10 });
     });
 
-    it('rejects a stranger', async () => {
-      playlists.findOne.mockResolvedValue(basePlaylist());
+    it('rejects a stranger when the license is invite-only', async () => {
+      playlists.findOne.mockResolvedValue(restricted());
       collaborators.findOne.mockResolvedValue(null);
 
       await expect(service.assertCanEdit(10, STRANGER)).rejects.toThrow(ForbiddenException);
@@ -82,6 +90,30 @@ describe('PlaylistEditorService', () => {
       playlists.findOne.mockResolvedValue(null);
 
       await expect(service.assertCanEdit(10, OWNER)).rejects.toThrow(NotFoundException);
+    });
+
+    // Sujet V.2.3 : "By default, everyone can edit the playlist."
+    it('lets any viewer edit a public playlist under the default open license', async () => {
+      playlists.findOne.mockResolvedValue(basePlaylist({ isPublic: true }));
+
+      await expect(service.assertCanEdit(10, STRANGER)).resolves.toMatchObject({ id: 10 });
+      expect(collaborators.findOne).not.toHaveBeenCalled();
+    });
+
+    // Les deux axes se composent : la licence ouverte ne contourne pas la
+    // visibilite, on ne peut pas editer ce qu'on n'a meme pas le droit de voir.
+    it('still rejects a stranger on a private playlist even under the open license', async () => {
+      playlists.findOne.mockResolvedValue(basePlaylist({ isPublic: false }));
+      collaborators.findOne.mockResolvedValue(null);
+
+      await expect(service.assertCanEdit(10, STRANGER)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('lets an invited collaborator edit a private playlist under the open license', async () => {
+      playlists.findOne.mockResolvedValue(basePlaylist({ isPublic: false }));
+      collaborators.findOne.mockResolvedValue({ id: 99 });
+
+      await expect(service.assertCanEdit(10, COLLABORATOR)).resolves.toMatchObject({ id: 10 });
     });
   });
 

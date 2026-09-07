@@ -13,10 +13,14 @@ export type ApiPlaylistTrack = {
   addedAt: string;
 };
 
+/** Qui peut éditer, indépendamment de isPublic qui ne règle que la lecture. */
+export type PlaylistLicenseMode = 'open' | 'invite-only';
+
 export type ApiPlaylist = {
   id: number;
   name: string;
   isPublic: boolean;
+  licenseMode: PlaylistLicenseMode;
   version: number;
   owner: { id: number; username: string };
   tracks?: ApiPlaylistTrack[];
@@ -37,6 +41,7 @@ export type PlaylistState = {
   id: number;
   name: string;
   isPublic: boolean;
+  licenseMode: PlaylistLicenseMode;
   version: number;
   owner: { id: number; username: string };
   collaborators: PlaylistCollaborator[];
@@ -66,7 +71,11 @@ export function createPlaylist(token: string | null, body: { name: string; isPub
   return apiFetch('/playlist-editor', token, { method: 'POST', body: JSON.stringify(body) });
 }
 
-export function updatePlaylist(id: number, token: string | null, patch: { name?: string; isPublic?: boolean }): Promise<ApiPlaylist> {
+export function updatePlaylist(
+  id: number,
+  token: string | null,
+  patch: { name?: string; isPublic?: boolean; licenseMode?: PlaylistLicenseMode },
+): Promise<ApiPlaylist> {
   return apiFetch(`/playlist-editor/${id}`, token, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
