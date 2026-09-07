@@ -41,8 +41,16 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
     ) {}
 
     async handleConnection(client: AuthedSocket) {
+        if (!(await this.authenticate(client))) client.disconnect(true);
+    }
+
+    /**
+     * Pose userId/username sur le socket. Renvoie null si le token manque, est
+     * invalide ou revoque.
+     */
+    private async authenticate(client: AuthedSocket): Promise<number | null> {
         const token = this.extractToken(client);
-        if (!token) return client.disconnect(true);
+        if (!token) return null;
 
         try {
             const payload = await this.jwt.verifyAsync<{ sub: number; username: string }>(token, {
@@ -50,18 +58,31 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
             });
             // meme liste noire que JwtStrategy : un token revoque ne doit pas
             // pouvoir ouvrir un socket alors qu'il est refuse en HTTP
-            if (await this.cache.get(`blacklist:${token}`)) return client.disconnect(true);
+            if (await this.cache.get(`blacklist:${token}`)) return null;
 
             client.data.userId = payload.sub;
             client.data.username = payload.username;
+            return payload.sub;
         } catch {
-            client.disconnect(true);
+            return null;
         }
+    }
+
+    /**
+     * handleConnection est asynchrone, alors que l'evenement 'connect' part
+     * cote client des que la connexion est etablie : un message emis dans la
+     * foulee arrive AVANT que l'auth soit posee. Se contenter de lire
+     * client.data.userId le jetait alors en silence — reproduit a 0/12 sur un
+     * join immediat. On rejoue donc l'auth ici au lieu d'abandonner.
+     */
+    private resolveUserId(client: AuthedSocket): Promise<number | null> {
+        if (client.data?.userId) return Promise.resolve(client.data.userId);
+        return this.authenticate(client);
     }
 
     @SubscribeMessage('playlist:join')
     async onJoin(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { playlistId: number }) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             await this.playlists.assertCanView(dto.playlistId, userId);
@@ -84,7 +105,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         @ConnectedSocket() client: AuthedSocket,
         @MessageBody() dto: AddTrackDto & { playlistId: number },
     ) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         // playlistId retire du reste : il adresse la room, ce n'est pas une
         // colonne de PlaylistTrack.
@@ -103,7 +124,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         @ConnectedSocket() client: AuthedSocket,
         @MessageBody() dto: { playlistId: number; trackId: number },
     ) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             await this.playlists.removeTrack(dto.playlistId, dto.trackId, userId);
@@ -119,7 +140,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         @ConnectedSocket() client: AuthedSocket,
         @MessageBody() dto: { playlistId: number; trackIds: number[]; version?: number },
     ) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             await this.playlists.reorder(dto.playlistId, userId, dto.trackIds, dto.version);

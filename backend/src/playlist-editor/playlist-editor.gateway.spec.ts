@@ -31,7 +31,7 @@ describe('PlaylistEditorGateway', () => {
       providers: [
         PlaylistEditorGateway,
         { provide: PlaylistEditorService, useValue: service },
-        { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
+        { provide: JwtService, useValue: { verifyAsync: jest.fn().mockResolvedValue({ sub: 1, username: 'u' }) } },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('secret') } },
         { provide: CACHE_MANAGER, useValue: { get: jest.fn().mockResolvedValue(null) } },
       ],
@@ -49,6 +49,27 @@ describe('PlaylistEditorGateway', () => {
     expect(client.join).toHaveBeenCalledWith(playlistRoomOf(10));
     expect(client.emit).toHaveBeenCalledWith('playlist:state', STATE);
     expect(emit).not.toHaveBeenCalled();
+  });
+
+  // handleConnection est async : un join emis juste apres 'connect' arrive
+  // avant que client.data.userId soit pose. Reproduit a 0/12 en conditions
+  // reelles avant correction.
+  it('still serves a join that arrives before handleConnection has authenticated', async () => {
+    const client = { data: {}, handshake: { auth: { token: 'jwt' }, headers: {} }, join: jest.fn(), emit: jest.fn() } as any;
+
+    await gateway.onJoin(client, { playlistId: 10 });
+
+    expect(client.join).toHaveBeenCalledWith(playlistRoomOf(10));
+    expect(client.emit).toHaveBeenCalledWith('playlist:state', STATE);
+  });
+
+  it('ignores a join from a socket with no usable token', async () => {
+    const client = { data: {}, handshake: { auth: {}, headers: {} }, join: jest.fn(), emit: jest.fn() } as any;
+
+    await gateway.onJoin(client, { playlistId: 10 });
+
+    expect(client.join).not.toHaveBeenCalled();
+    expect(client.emit).not.toHaveBeenCalled();
   });
 
   it('refuses to join a playlist the user cannot view', async () => {

@@ -220,6 +220,16 @@ export class PlaylistEditorService {
 
     async addTrack(playlistId: number, userId: number, dto: AddTrackDto) {
         const playlist = await this.assertCanEdit(playlistId, userId);
+
+        // Unicite par morceau Deezer et par playlist : le meme titre peut vivre
+        // dans plusieurs playlists, mais pas deux fois dans la meme. On compare
+        // sur deezerId et pas sur le titre, deux morceaux homonymes restant
+        // deux morceaux differents.
+        const duplicate = await this.tracks.findOne({
+            where: { playlist: { id: playlist.id }, deezerId: dto.deezerId },
+        });
+        if (duplicate) throw new ConflictException('This track is already in the playlist');
+
         const position = await this.tracks.count({ where: { playlist: { id: playlist.id } } });
         // juste l'id pour la relation, pas besoin de renvoyer la playlist entiere dans la reponse
         const track = this.tracks.create({ ...dto, position, playlist: { id: playlist.id } as any });
