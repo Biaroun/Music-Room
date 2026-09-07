@@ -3,6 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import { API_URL, apiFetch } from '../config/api';
 import { useAuth } from './AuthContext';
 import { useToast } from '../components/Toast';
+import type { AddTrackInput, PlaylistState } from '../lib/playlists';
 
 export type FriendListening = {
     userId: number;
@@ -65,6 +66,16 @@ type RealtimeContextType = {
     castVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
     /** retire un vote pour un morceau précis (un voteur peut voter plusieurs morceaux, un seul vote par morceau) */
     retractVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
+    /** état de la playlist rejointe (undefined tant qu'aucun snapshot n'est arrivé) */
+    playlistState: PlaylistState | undefined;
+    /** rejoint la room d'édition de cette playlist ; l'état arrive ensuite via playlistState */
+    joinPlaylist: (playlistId: number) => void;
+    leavePlaylist: (playlistId: number) => void;
+    /** édite via le socket quand connecté ; à l'appelant de faire un repli REST sinon */
+    addTrackRealtime: (playlistId: number, dto: AddTrackInput) => void;
+    removeTrackRealtime: (playlistId: number, trackId: number) => void;
+    /** version = celle du dernier état reçu ; le serveur refuse un reorder périmé */
+    reorderRealtime: (playlistId: number, trackIds: number[], version: number) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextType | null>(null);
@@ -81,9 +92,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const [connected, setConnected] = useState(false);
     const [friendsListening, setFriendsListening] = useState<Record<number, FriendListening>>({});
     const [voteBoard, setVoteBoard] = useState<VoteBoard | undefined>(undefined);
+    const [playlistState, setPlaylistState] = useState<PlaylistState | undefined>(undefined);
     const socketRef = useRef<Socket | null>(null);
     // rejoint automatiquement à la reconnexion si un écran de vote est ouvert
     const joinedEventIdRef = useRef<number | null>(null);
+    // idem pour l'éditeur de playlist
+    const joinedPlaylistIdRef = useRef<number | null>(null);
     // dernier morceau déclaré : sert à réémettre le heartbeat et à rejouer
     // l'état après une reconnexion
     const lastReportRef = useRef<ListeningReport | null>(null);
@@ -113,6 +127,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             if (lastReportRef.current) socket.emit('listening:update', lastReportRef.current);
             // reconnexion : la room de vote n'a pas survécu à la coupure
             if (joinedEventIdRef.current != null) socket.emit('event:join', { eventId: joinedEventIdRef.current });
+            // idem pour la room d'édition de playlist
+            if (joinedPlaylistIdRef.current != null) {
+                socket.emit('playlist:join', { playlistId: joinedPlaylistIdRef.current });
+            }
         });
         socket.on('disconnect', () => setConnected(false));
         socket.on('connect_error', () => setConnected(false));
@@ -137,6 +155,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         // rien ne l'affichait avant, on avait juste l'evenement sans listener.
         socket.on('vote:error', ({ message }: { message: string }) => {
             showToast({ type: 'error', message: message || 'Vote failed' });
+        });
+
+        socket.on('playlist:state', (state: PlaylistState) => setPlaylistState(state));
+        socket.on('playlist:error', ({ message }: { message: string }) => {
+            showToast({ type: 'error', message: message || 'Playlist update failed' });
+        });
+        // Édition concurrente : le serveur a refusé notre ordre et renvoie le
+        // sien. On l'adopte, sinon les deux écrans divergent durablement.
+        socket.on('playlist:conflict', ({ message, state }: { message: string; state: PlaylistState }) => {
+            setPlaylistState(state);
+            showToast({ type: 'error', message: message || 'Someone else reordered this playlist' });
         });
 
         return () => {
@@ -171,6 +200,29 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         },
         [],
     );
+
+    const joinPlaylist = useCallback((playlistId: number) => {
+        joinedPlaylistIdRef.current = playlistId;
+        setPlaylistState(undefined);
+        socketRef.current?.emit('playlist:join', { playlistId });
+    }, []);
+
+    const leavePlaylist = useCallback((playlistId: number) => {
+        if (joinedPlaylistIdRef.current === playlistId) joinedPlaylistIdRef.current = null;
+        socketRef.current?.emit('playlist:leave', { playlistId });
+    }, []);
+
+    const addTrackRealtime = useCallback((playlistId: number, dto: AddTrackInput) => {
+        socketRef.current?.emit('playlist:track:add', { playlistId, ...dto });
+    }, []);
+
+    const removeTrackRealtime = useCallback((playlistId: number, trackId: number) => {
+        socketRef.current?.emit('playlist:track:remove', { playlistId, trackId });
+    }, []);
+
+    const reorderRealtime = useCallback((playlistId: number, trackIds: number[], version: number) => {
+        socketRef.current?.emit('playlist:reorder', { playlistId, trackIds, version });
+    }, []);
 
     const reportListening = useCallback(
         (track: ListeningReport | null) => {
@@ -227,6 +279,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                 leaveEvent,
                 castVoteRealtime,
                 retractVoteRealtime,
+                playlistState,
+                joinPlaylist,
+                leavePlaylist,
+                addTrackRealtime,
+                removeTrackRealtime,
+                reorderRealtime,
             }}
         >
             {children}
