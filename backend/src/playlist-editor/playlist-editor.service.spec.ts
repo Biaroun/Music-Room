@@ -211,6 +211,31 @@ describe('PlaylistEditorService', () => {
       expect(playlists.increment).toHaveBeenCalledWith({ id: 10 }, 'version', 1);
     });
 
+    it('refuses a track already present in the playlist', async () => {
+      playlists.findOne.mockResolvedValue(basePlaylist());
+      tracks.findOne.mockResolvedValue({ id: 7, deezerId: 'dup' });
+
+      await expect(
+        service.addTrack(10, OWNER, { deezerId: 'dup', title: 't', artist: 'a', previewUrl: 'u' } as any),
+      ).rejects.toThrow(ConflictException);
+      expect(tracks.save).not.toHaveBeenCalled();
+      expect(playlists.increment).not.toHaveBeenCalled();
+    });
+
+    it('looks the duplicate up scoped to this playlist, not globally', async () => {
+      playlists.findOne.mockResolvedValue(basePlaylist());
+      tracks.findOne.mockResolvedValue(null);
+      tracks.count.mockResolvedValue(0);
+      tracks.create.mockReturnValue({ id: 5 });
+      tracks.save.mockResolvedValue({ id: 5 });
+
+      await service.addTrack(10, OWNER, { deezerId: 'dz', title: 't', artist: 'a', previewUrl: 'u' } as any);
+
+      expect(tracks.findOne).toHaveBeenCalledWith({
+        where: { playlist: { id: 10 }, deezerId: 'dz' },
+      });
+    });
+
     it('bumps the version when a track is removed', async () => {
       playlists.findOne.mockResolvedValue(basePlaylist());
       tracks.findOne.mockResolvedValue({ id: 5 });
