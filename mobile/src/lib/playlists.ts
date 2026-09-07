@@ -17,10 +17,31 @@ export type ApiPlaylist = {
   id: number;
   name: string;
   isPublic: boolean;
+  version: number;
   owner: { id: number; username: string };
   tracks?: ApiPlaylistTrack[];
+  /** false quand la playlist m'est partagée : le mobile masque les actions owner-only */
+  isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PlaylistCollaborator = {
+  id: number;
+  username: string;
+  avatar: string | null;
+};
+
+/** État complet poussé par la gateway sur playlist:state. */
+export type PlaylistState = {
+  id: number;
+  name: string;
+  isPublic: boolean;
+  version: number;
+  owner: { id: number; username: string };
+  collaborators: PlaylistCollaborator[];
+  tracks: ApiPlaylistTrack[];
+  updatedAt: number;
 };
 
 export type AddTrackInput = {
@@ -61,9 +82,31 @@ export function removeTrackFromPlaylist(playlistId: number, trackId: number, tok
   return apiFetch(`/playlist-editor/${playlistId}/tracks/${trackId}`, token, { method: 'DELETE' });
 }
 
-export function reorderPlaylistTracks(playlistId: number, token: string | null, trackIds: number[]): Promise<ApiPlaylist> {
+// version = celle du dernier état vu. Le backend refuse en 409 si quelqu'un a
+// réordonné entre-temps, plutôt que d'écraser son ordre en silence.
+export function reorderPlaylistTracks(
+  playlistId: number,
+  token: string | null,
+  trackIds: number[],
+  version?: number,
+): Promise<PlaylistState> {
   return apiFetch(`/playlist-editor/${playlistId}/tracks/reorder`, token, {
     method: 'PATCH',
-    body: JSON.stringify({ trackIds }),
+    body: JSON.stringify({ trackIds, version }),
   });
+}
+
+export function listCollaborators(playlistId: number, token: string | null): Promise<PlaylistCollaborator[]> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token);
+}
+
+export function addCollaborator(playlistId: number, token: string | null, userId: number): Promise<unknown> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function removeCollaborator(playlistId: number, token: string | null, userId: number): Promise<void> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators/${userId}`, token, { method: 'DELETE' });
 }
