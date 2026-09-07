@@ -103,16 +103,25 @@ export default function PlaylistsScreen({ navigation }: any) {
                 <Text style={styles.meta}>
                   {item.isPublic ? 'Public' : 'Private'} · {item.tracks?.length ?? 0} songs
                 </Text>
+                {item.isOwner === false && (
+                  <View style={styles.sharedBadge}>
+                    <Ionicons name="people" size={11} color={colors.textSecondary} />
+                    <Text style={styles.meta}>Shared</Text>
+                  </View>
+                )}
               </View>
             </View>
-            <Pressable
-              onPress={() => handleDelete(item.id)}
-              hitSlop={8}
-              accessibilityLabel={`Delete ${item.name}`}
-              style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }, { cursor: 'pointer' }]}
-            >
-              <Ionicons name="trash-outline" size={18} color={colors.danger} />
-            </Pressable>
+            {/* Seul le proprietaire peut supprimer : un collaborateur n'edite que le contenu */}
+            {item.isOwner !== false && (
+              <Pressable
+                onPress={() => handleDelete(item.id)}
+                hitSlop={8}
+                accessibilityLabel={`Delete ${item.name}`}
+                style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.6 }, { cursor: 'pointer' }]}
+              >
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              </Pressable>
+            )}
           </PressableCard>
         )}
       />
@@ -159,6 +168,11 @@ const styles = StyleSheet.create({
   name: { color: colors.textPrimary, fontSize: 15, fontWeight: '700' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 3 },
   meta: { color: colors.textSecondary, fontSize: 12 },
+  sharedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingVertical: 1, paddingHorizontal: spacing.xs,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
+  },
   deleteBtn: { padding: spacing.xs },
 
   // box-none : la zone autour du bouton laisse passer les clics vers la liste dessous
