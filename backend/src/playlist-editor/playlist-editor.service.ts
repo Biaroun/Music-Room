@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Playlist } from './playlist.entity';
+import { Playlist, PlaylistLicenseMode } from './playlist.entity';
 import { PlaylistTrack } from './playlist-track.entity';
 import { PlaylistCollaborator } from './playlist-collaborator.entity';
 import { User } from '../users/user.entity';
@@ -16,6 +16,7 @@ export type PlaylistState = {
     id: number;
     name: string;
     isPublic: boolean;
+    licenseMode: PlaylistLicenseMode;
     version: number;
     owner: { id: number; username: string };
     collaborators: CollaboratorSummary[];
@@ -106,9 +107,16 @@ export class PlaylistEditorService {
         return playlist;
     }
 
-    /** Droit d'ecriture sur le contenu : proprietaire ou collaborateur invite. */
+    /**
+     * Droit d'ecriture sur le contenu. Deux axes qui se composent, comme
+     * EventService.assertCanVote : d'abord la visibilite (on ne peut pas editer
+     * ce qu'on n'a pas le droit de voir), puis la licence. En licence OPEN
+     * (defaut du sujet) tout spectateur edite ; en INVITE_ONLY seuls le
+     * proprietaire et les collaborateurs invites.
+     */
     async assertCanEdit(playlistId: number, userId: number): Promise<Playlist> {
-        const playlist = await this.load(playlistId);
+        const playlist = await this.assertCanView(playlistId, userId);
+        if (playlist.licenseMode === PlaylistLicenseMode.OPEN) return playlist;
         if (playlist.owner.id === userId) return playlist;
         if (await this.isCollaborator(playlistId, userId)) return playlist;
         throw new ForbiddenException('You are not an editor of this playlist');
@@ -152,6 +160,7 @@ export class PlaylistEditorService {
             id: playlist.id,
             name: playlist.name,
             isPublic: playlist.isPublic,
+            licenseMode: playlist.licenseMode,
             version: playlist.version,
             owner: { id: playlist.owner.id, username: playlist.owner.username },
             collaborators: await this.collaboratorSummaries(playlistId),

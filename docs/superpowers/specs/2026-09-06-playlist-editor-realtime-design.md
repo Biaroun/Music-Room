@@ -53,6 +53,36 @@ The reference implementation to follow already exists in this repo: `track-vote`
 | Concurrency strategy | Version guard on `reorder` only; add/remove stay last-write-wins |
 | Drag & drop? | No — keep the existing chevrons |
 
+### Amendment, 2026-09-07 — license mode
+
+The first implementation hard-coded the invited-collaborators rule as the only
+behaviour. Re-reading V.2.3 against the PDF showed that is only half the
+requirement:
+
+> - By default, everyone can edit the playlist.
+> - With the right license, the invited users are the only ones who can edit the playlist.
+
+Editing rights are a **second axis**, independent of visibility — the same
+separation `Event` already makes between `visibility` and `licenseMode`.
+`Playlist` therefore gains `licenseMode: PlaylistLicenseMode` (`OPEN` default,
+`INVITE_ONLY`), and `assertCanEdit` chains the two axes exactly as
+`EventService.assertCanVote` does: visibility first, then the license. The
+collaborator table built above becomes the invitee list of the restricted mode;
+nothing is discarded.
+
+Resulting matrix (verified end to end, see Part 6):
+
+| Visibility | License | Reads | Edits |
+|---|---|---|---|
+| public | `open` (default) | everyone | **everyone** |
+| public | `invite-only` | everyone | owner + collaborators |
+| private | `open` | owner + collaborators | owner + collaborators |
+| private | `invite-only` | owner + collaborators | owner + collaborators |
+
+The last two rows are identical in effect: on a private playlist the visibility
+axis already restricts the audience to invitees, so the license only bites on
+public playlists. The same is true of `INVITE_ONLY` on events.
+
 ---
 
 ## Part 1 — Collaboration model
