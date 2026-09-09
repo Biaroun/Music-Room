@@ -9,6 +9,9 @@ backend/.env
 backend/.env.seed-users
 mobile/.env
 
+# Pool du test de charge : contient des mots de passe et des JWT valides 7 jours
+scripts/load/load-users.json
+
 # Build
 backend/dist/
 mobile/.expo/
@@ -32,3 +35,6 @@ backend/src/migrations/
 
 # Test coverage
 coverage/
+
+# Notes de soutenance : antiseche perso, pas un livrable
+NOTES-SOUTENANCE.md
