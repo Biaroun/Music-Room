@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { API_URL, apiFetch } from '../config/api';
+import { DEVICE_CONTEXT } from '../config/device';
 import { useAuth } from './AuthContext';
 import { useToast } from '../components/Toast';
 import type { AddTrackInput, PlaylistState } from '../lib/playlists';
@@ -51,39 +52,39 @@ export type VoteBoard = {
 };
 
 type RealtimeContextType = {
-    /** true quand le websocket est établi ; sinon on est en repli REST */
+    /** true quand le websocket est etabli ; sinon on est en repli rest */
     connected: boolean;
-    /** écoutes en cours des amis, indexées par userId */
+    /** ecoutes en cours des amis, indexees par userId */
     friendsListening: Record<number, FriendListening>;
-    /** déclare ce que j'écoute, ou null quand je m'arrête */
+    /** declare ce que j'ecoute, ou null quand je m'arrete */
     reportListening: (track: ListeningReport | null) => void;
-    /** board du dernier event rejoint (undefined tant qu'aucun snapshot n'est arrivé) */
+    /** board du dernier event rejoint (undefined tant qu'aucun snapshot n'est arrive) */
     voteBoard: VoteBoard | undefined;
     /** rejoint la room de vote de cet event ; le board arrive ensuite via voteBoard */
     joinEvent: (eventId: number) => void;
     leaveEvent: (eventId: number) => void;
-    /** vote via le socket quand connecté ; à l'appelant de faire un repli REST sinon */
+    /** vote via le socket quand connecte ; a l'appelant de faire un repli rest sinon */
     castVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
-    /** retire un vote pour un morceau précis (un voteur peut voter plusieurs morceaux, un seul vote par morceau) */
+    /** retire un vote pour un morceau precis (un voteur peut voter plusieurs morceaux, un seul vote par morceau) */
     retractVoteRealtime: (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => void;
-    /** état de la playlist rejointe (undefined tant qu'aucun snapshot n'est arrivé) */
+    /** etat de la playlist rejointe (undefined tant qu'aucun snapshot n'est arrive) */
     playlistState: PlaylistState | undefined;
-    /** rejoint la room d'édition de cette playlist ; l'état arrive ensuite via playlistState */
+    /** rejoint la room d'edition de cette playlist ; l'etat arrive ensuite via playlistState */
     joinPlaylist: (playlistId: number) => void;
     leavePlaylist: (playlistId: number) => void;
-    /** édite via le socket quand connecté ; à l'appelant de faire un repli REST sinon */
+    /** edite via le socket quand connecte ; a l'appelant de faire un repli rest sinon */
     addTrackRealtime: (playlistId: number, dto: AddTrackInput) => void;
     removeTrackRealtime: (playlistId: number, trackId: number) => void;
-    /** version = celle du dernier état reçu ; le serveur refuse un reorder périmé */
+    /** version = celle du dernier etat recu ; le serveur refuse un reorder perime */
     reorderRealtime: (playlistId: number, trackIds: number[], version: number) => void;
 };
 
 const RealtimeContext = createContext<RealtimeContextType | null>(null);
 
-// Doit rester sous le TTL du backend (120s) pour qu'un heartbeat perdu
-// ne fasse pas disparaître l'écoute.
+// doit rester sous le ttl du backend (120s) pour qu'un heartbeat perdu
+// ne fasse pas disparaitre l'ecoute.
 const HEARTBEAT_MS = 45_000;
-// Utilisé seulement quand le websocket ne passe pas.
+// utilise seulement quand le websocket ne passe pas.
 const FALLBACK_POLL_MS = 20_000;
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
@@ -94,12 +95,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const [voteBoard, setVoteBoard] = useState<VoteBoard | undefined>(undefined);
     const [playlistState, setPlaylistState] = useState<PlaylistState | undefined>(undefined);
     const socketRef = useRef<Socket | null>(null);
-    // rejoint automatiquement à la reconnexion si un écran de vote est ouvert
+    // rejoint automatiquement a la reconnexion si un ecran de vote est ouvert
     const joinedEventIdRef = useRef<number | null>(null);
-    // idem pour l'éditeur de playlist
+    // idem pour l'editeur de playlist
     const joinedPlaylistIdRef = useRef<number | null>(null);
-    // dernier morceau déclaré : sert à réémettre le heartbeat et à rejouer
-    // l'état après une reconnexion
+    // dernier morceau declare : sert a reemettre le heartbeat et a rejouer
+    // l'etat apres une reconnexion
     const lastReportRef = useRef<ListeningReport | null>(null);
 
     function indexByUser(list: FriendListening[]): Record<number, FriendListening> {
@@ -113,21 +114,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         }
 
         // transports websocket only : en React Native le polling XHR d'engine.io
-        // pose plus de problèmes qu'il n'en résout
+        // pose plus de problemes qu'il n'en resout
         const socket = io(`${API_URL}/realtime`, {
             transports: ['websocket'],
-            auth: { token },
+            // le triplet v.6 voyage dans le payload du handshake : pas d'en-tete
+            // par message en websocket, et une partie des actions ne passe plus
+            // par apiFetch depuis le playlist-editor temps reel
+            auth: { token, ...DEVICE_CONTEXT },
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
             setConnected(true);
-            // on redéclare l'écoute en cours : le backend a pu perdre l'état
+            // on redeclare l'ecoute en cours : le backend a pu perdre l'etat
             // pendant la coupure
             if (lastReportRef.current) socket.emit('listening:update', lastReportRef.current);
-            // reconnexion : la room de vote n'a pas survécu à la coupure
+            // reconnexion : la room de vote n'a pas survecu a la coupure
             if (joinedEventIdRef.current != null) socket.emit('event:join', { eventId: joinedEventIdRef.current });
-            // idem pour la room d'édition de playlist
+            // idem pour la room d'edition de playlist
             if (joinedPlaylistIdRef.current != null) {
                 socket.emit('playlist:join', { playlistId: joinedPlaylistIdRef.current });
             }
@@ -151,7 +155,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         });
 
         socket.on('vote:board', (board: VoteBoard) => setVoteBoard(board));
-        // sans ça un vote refusé cote serveur (licence/visibilite) echoue en silence :
+        // sans ca un vote refuse cote serveur (licence/visibilite) echoue en silence :
         // rien ne l'affichait avant, on avait juste l'evenement sans listener.
         socket.on('vote:error', ({ message }: { message: string }) => {
             showToast({ type: 'error', message: message || 'Vote failed' });
@@ -161,8 +165,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         socket.on('playlist:error', ({ message }: { message: string }) => {
             showToast({ type: 'error', message: message || 'Playlist update failed' });
         });
-        // Édition concurrente : le serveur a refusé notre ordre et renvoie le
-        // sien. On l'adopte, sinon les deux écrans divergent durablement.
+        // edition concurrente : le serveur a refuse notre ordre et renvoie le
+        // sien. on l'adopte, sinon les deux ecrans divergent durablement.
         socket.on('playlist:conflict', ({ message, state }: { message: string; state: PlaylistState }) => {
             setPlaylistState(state);
             showToast({ type: 'error', message: message || 'Someone else reordered this playlist' });
@@ -235,7 +239,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                 else socket.emit('listening:stop');
                 return;
             }
-            // repli REST : la fonctionnalité doit marcher même sans websocket
+            // repli rest : la fonctionnalite doit marcher meme sans websocket
             const request = track
                 ? apiFetch('/listening/me', token, { method: 'PUT', body: JSON.stringify(track) })
                 : apiFetch('/listening/me', token, { method: 'DELETE' });
@@ -244,8 +248,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         [token],
     );
 
-    // Heartbeat : sans rappel régulier la clé expire côté backend et l'écoute
-    // disparaît de l'écran des amis.
+    // heartbeat : sans rappel regulier la cle expire cote backend et l'ecoute
+    // disparait de l'ecran des amis.
     useEffect(() => {
         if (!token) return;
         const id = setInterval(() => {
@@ -254,7 +258,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         return () => clearInterval(id);
     }, [token, reportListening]);
 
-    // Repli : tant que le websocket ne passe pas, on interroge le REST.
+    // repli : tant que le websocket ne passe pas, on interroge le REST.
     useEffect(() => {
         if (!token || connected) return;
         let active = true;

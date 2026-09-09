@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
+import { deviceHeaders } from './device';
 
-// Web (navigateur) → localhost ; émulateur Android → 10.0.2.2 ; iOS sim → localhost
+// web (navigateur) -> localhost ; emulateur Android -> 10.0.2.2 ; iOS sim -> localhost
 const DEFAULT_URL = Platform.OS === 'web' ? 'http://localhost:3000' : 'http://10.0.2.2:3000';
 
-// URL configurable via .env (sujet V.5), sinon valeur par défaut
+// url configurable via .env (sujet V.5), sinon valeur par defaut
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_URL;
 
 export async function apiFetch(path: string, token: string | null, options: RequestInit = {}) {
@@ -11,6 +12,8 @@ export async function apiFetch(path: string, token: string | null, options: Requ
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      // sujet v.6 : plateforme, appareil et version sur chaque action mobile
+      ...deviceHeaders,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
