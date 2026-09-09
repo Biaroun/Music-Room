@@ -2,11 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { LogsInterceptor } from './logs/logs.interceptor';
-import { AllExceptionsFilter } from './logs/all-exceptions.filter';
 import { createServer } from 'net';
 
-// si le port est déjà pris, on prend le suivant (pratique quand j'ai déjà un truc sur 3000)
+// si le port est pris, on prend le suivant
 function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number> {
   return new Promise((resolve, reject) => {
     const tryPort = (port: number, attemptsLeft: number) => {
@@ -38,8 +36,8 @@ async function bootstrap() {
       }),
   );
 
-  app.useGlobalInterceptors(new LogsInterceptor());
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // LogsInterceptor et AllExceptionsFilter sont poses dans LogsModule : ils
+  // injectent LogsService, donc plus instanciables a la main ici
 
   const config = new DocumentBuilder()
       .setTitle('Music Room API')

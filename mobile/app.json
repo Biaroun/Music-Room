@@ -22,7 +22,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["ACCESS_FINE_LOCATION"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,7 +37,8 @@
         {
           "locationWhenInUsePermission": "Music Room needs your location to check you're allowed to vote in a location-restricted event."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }
