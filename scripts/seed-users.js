@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const API_URL = process.env.API_URL || 'http://localhost:8081';
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 const CREDENTIALS_FILE = path.join(__dirname, '..', 'backend', '.env.seed-users');
 
 const USERS = [
@@ -63,10 +63,21 @@ async function apiRequest(pathName, { method = 'GET', token = null, body = null 
 
 async function createUser(spec) {
   const password = generatePassword();
-  const { access_token: token } = await apiRequest('/auth/register', {
-    method: 'POST',
-    body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
-  });
+  let token;
+  try {
+    ({ access_token: token } = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
+    }));
+  } catch (err) {
+    // bug backend connu : /auth/register cree le user puis renvoie 500 si le
+    // mail de verification est rate-limite. le compte existe quand meme, donc
+    // on retente par login avant d'abandonner.
+    ({ access_token: token } = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { login: spec.email, password },
+    }));
+  }
 
   const me = await apiRequest('/users/me', { token });
   await apiRequest('/users/me', { method: 'PATCH', token, body: { avatar: spec.avatar } });
