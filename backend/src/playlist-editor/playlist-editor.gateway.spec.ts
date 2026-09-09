@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { LogsService } from '../logs/logs.service';
 import { ConflictException } from '@nestjs/common';
 import { PlaylistEditorGateway, playlistRoomOf } from './playlist-editor.gateway';
 import { PlaylistEditorService } from './playlist-editor.service';
@@ -34,6 +35,9 @@ describe('PlaylistEditorGateway', () => {
         { provide: JwtService, useValue: { verifyAsync: jest.fn().mockResolvedValue({ sub: 1, username: 'u' }) } },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('secret') } },
         { provide: CACHE_MANAGER, useValue: { get: jest.fn().mockResolvedValue(null) } },
+        // @UseInterceptors sur le gateway fait de LogsInterceptor un injectable
+        // du module de test, qui reclame donc LogsService
+        { provide: LogsService, useValue: { record: jest.fn() } },
       ],
     }).compile();
 
@@ -52,8 +56,7 @@ describe('PlaylistEditorGateway', () => {
   });
 
   // handleConnection est async : un join emis juste apres 'connect' arrive
-  // avant que client.data.userId soit pose. Reproduit a 0/12 en conditions
-  // reelles avant correction.
+  // avant que client.data.userId soit pose
   it('still serves a join that arrives before handleConnection has authenticated', async () => {
     const client = { data: {}, handshake: { auth: { token: 'jwt' }, headers: {} }, join: jest.fn(), emit: jest.fn() } as any;
 

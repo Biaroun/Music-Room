@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { JwtService } from '@nestjs/jwt';
@@ -12,6 +12,7 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { LogsInterceptor } from '../logs/logs.interceptor';
 import { PlaylistEditorService } from './playlist-editor.service';
 import { AddTrackDto } from './dto/add-track.dto';
 
@@ -22,12 +23,16 @@ export function playlistRoomOf(playlistId: number): string {
 }
 
 /**
- * Meme namespace '/realtime' que ListeningGateway et TrackVoteGateway : un seul
- * socket cote mobile pour l'ecoute, le vote et l'edition. Une room par playlist,
- * tous ses editeurs recoivent le meme etat.
- * REST reste la source de verite / le repli (voir PlaylistEditorController) ;
+ * namespace '/realtime' partage avec ListeningGateway et TrackVoteGateway : un
+ * seul socket cote mobile pour l'ecoute, le vote et l'edition. une room par
+ * playlist, tous ses editeurs recoivent le meme etat.
+ * rest reste la source de verite et le repli (voir PlaylistEditorController),
  * ce gateway ne fait que pousser l'etat a la room.
  */
+// log v.6 branche a la main : @nestjs/websockets construit son
+// InterceptorsContextCreator sans l'ApplicationConfig, donc un APP_INTERCEPTOR
+// n'atteint jamais un @SubscribeMessage
+@UseInterceptors(LogsInterceptor)
 @WebSocketGateway({ namespace: '/realtime', cors: { origin: '*' } })
 export class PlaylistEditorGateway implements OnGatewayConnection {
     @WebSocketServer() server: Server;
@@ -44,10 +49,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         if (!(await this.authenticate(client))) client.disconnect(true);
     }
 
-    /**
-     * Pose userId/username sur le socket. Renvoie null si le token manque, est
-     * invalide ou revoque.
-     */
+    /** pose userId/username sur le socket, null si le token manque ou est revoque */
     private async authenticate(client: AuthedSocket): Promise<number | null> {
         const token = this.extractToken(client);
         if (!token) return null;
@@ -56,8 +58,8 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
             const payload = await this.jwt.verifyAsync<{ sub: number; username: string }>(token, {
                 secret: this.config.get<string>('JWT_SECRET'),
             });
-            // meme liste noire que JwtStrategy : un token revoque ne doit pas
-            // pouvoir ouvrir un socket alors qu'il est refuse en HTTP
+            // meme liste noire que JwtStrategy : un token revoque en http ne
+            // doit pas pouvoir ouvrir un socket
             if (await this.cache.get(`blacklist:${token}`)) return null;
 
             client.data.userId = payload.sub;
@@ -69,11 +71,10 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
     }
 
     /**
-     * handleConnection est asynchrone, alors que l'evenement 'connect' part
-     * cote client des que la connexion est etablie : un message emis dans la
-     * foulee arrive AVANT que l'auth soit posee. Se contenter de lire
-     * client.data.userId le jetait alors en silence — reproduit a 0/12 sur un
-     * join immediat. On rejoue donc l'auth ici au lieu d'abandonner.
+     * handleConnection est asynchrone alors que 'connect' part cote client des
+     * que la connexion est etablie : un message emis dans la foulee arrive
+     * avant l'auth. lire client.data.userId seul le jetait en silence, d'ou le
+     * rejeu de l'auth ici.
      */
     private resolveUserId(client: AuthedSocket): Promise<number | null> {
         if (client.data?.userId) return Promise.resolve(client.data.userId);
@@ -91,7 +92,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
             return;
         }
         await client.join(playlistRoomOf(dto.playlistId));
-        // snapshot immediat : le joiner n'attend pas l'edition de quelqu'un d'autre
+        // snapshot immediat : le joiner n'attend pas l'edition d'un autre
         client.emit('playlist:state', await this.playlists.getState(dto.playlistId));
     }
 
@@ -107,8 +108,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
     ) {
         const userId = await this.resolveUserId(client);
         if (!userId) return;
-        // playlistId retire du reste : il adresse la room, ce n'est pas une
-        // colonne de PlaylistTrack.
+        // playlistId adresse la room, ce n'est pas une colonne de PlaylistTrack
         const { playlistId, ...track } = dto;
         try {
             await this.playlists.addTrack(playlistId, userId, track);
@@ -145,9 +145,9 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         try {
             await this.playlists.reorder(dto.playlistId, userId, dto.trackIds, dto.version);
         } catch (err) {
-            // Conflit d'edition concurrente : on renvoie l'etat frais a
-            // l'emetteur seul, pour qu'il adopte l'ordre du serveur au lieu de
-            // deviner. Les autres n'ont rien a reafficher, rien n'a change.
+            // edition concurrente : l'etat frais part au seul emetteur, pour
+            // qu'il adopte l'ordre du serveur. les autres n'ont rien a
+            // reafficher, rien n'a change
             if (err instanceof ConflictException) {
                 client.emit('playlist:conflict', {
                     message: err.message,
@@ -162,9 +162,9 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
     }
 
     /**
-     * Un etat de playlist est identique pour tous ses spectateurs, contrairement
-     * au board de track-vote qui porte un myVote par utilisateur : une seule
-     * lecture et un seul emit suffisent, pas de boucle sur fetchSockets().
+     * l'etat est le meme pour tous les spectateurs, contrairement au board de
+     * track-vote qui porte un myVote par utilisateur : une lecture et un emit
+     * suffisent, pas de boucle sur fetchSockets().
      */
     async broadcastState(playlistId: number) {
         const state = await this.playlists.getState(playlistId);

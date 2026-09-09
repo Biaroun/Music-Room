@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, UseInterceptors } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
@@ -13,6 +13,7 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { LogsInterceptor } from '../logs/logs.interceptor';
 import { EventService } from './event.service';
 import { Board, TrackVoteService } from './track-vote.service';
 import { CastVoteDto } from './dto/cast-vote.dto';
@@ -25,19 +26,23 @@ export function eventRoomOf(eventId: number): string {
 }
 
 /**
- * Meme namespace '/realtime' que ListeningGateway : un seul socket cote mobile
- * pour l'ecoute en cours et le vote. Rooms par event (pas par utilisateur) :
- * tous les participants d'un event recoivent le meme board.
- * REST reste la source de verite / le repli (voir TrackVoteController) ; ce
- * gateway ne fait que pousser les recalculs de board a la room.
+ * namespace '/realtime' partage avec ListeningGateway : un seul socket cote
+ * mobile pour l'ecoute et le vote. rooms par event et pas par utilisateur,
+ * tous les participants recoivent le meme board.
+ * rest reste la source de verite et le repli (voir TrackVoteController), ce
+ * gateway ne fait que pousser les recalculs de board.
  */
+// log v.6 branche a la main : @nestjs/websockets construit son
+// InterceptorsContextCreator sans l'ApplicationConfig, donc un APP_INTERCEPTOR
+// n'atteint jamais un @SubscribeMessage
+@UseInterceptors(LogsInterceptor)
 @WebSocketGateway({ namespace: '/realtime', cors: { origin: '*' } })
 export class TrackVoteGateway implements OnGatewayConnection {
     @WebSocketServer() server: Server;
     private readonly logger = new Logger(TrackVoteGateway.name);
-    // Un minuteur par event, arme sur la fin du morceau en cours : c'est lui
-    // qui pousse l'avancee automatique de la file sans attendre qu'un client
-    // rafraichisse. S'auto-eteint des que plus personne n'est dans la room.
+    // un minuteur par event, arme sur la fin du morceau en cours : c'est lui
+    // qui fait avancer la file sans attendre qu'un client rafraichisse.
+    // s'eteint des que la room est vide
     private tickers = new Map<number, Timer>();
 
     constructor(
@@ -49,25 +54,44 @@ export class TrackVoteGateway implements OnGatewayConnection {
     ) {}
 
     async handleConnection(client: AuthedSocket) {
+        if (!(await this.authenticate(client))) client.disconnect(true);
+    }
+
+    /** pose userId/username sur le socket, null si le token manque ou est revoque */
+    private async authenticate(client: AuthedSocket): Promise<number | null> {
         const token = this.extractToken(client);
-        if (!token) return client.disconnect(true);
+        if (!token) return null;
 
         try {
             const payload = await this.jwt.verifyAsync<{ sub: number; username: string }>(token, {
                 secret: this.config.get<string>('JWT_SECRET'),
             });
-            if (await this.cache.get(`blacklist:${token}`)) return client.disconnect(true);
+            // meme liste noire que JwtStrategy : un token revoque en http ne
+            // doit pas pouvoir ouvrir un socket
+            if (await this.cache.get(`blacklist:${token}`)) return null;
 
             client.data.userId = payload.sub;
             client.data.username = payload.username;
+            return payload.sub;
         } catch {
-            client.disconnect(true);
+            return null;
         }
+    }
+
+    /**
+     * handleConnection est asynchrone alors que 'connect' part cote client des
+     * que la connexion est etablie : un message emis dans la foulee arrive
+     * avant l'auth. lire client.data.userId seul le jetait en silence, d'ou le
+     * rejeu de l'auth ici. meme correctif que PlaylistEditorGateway.
+     */
+    private resolveUserId(client: AuthedSocket): Promise<number | null> {
+        if (client.data?.userId) return Promise.resolve(client.data.userId);
+        return this.authenticate(client);
     }
 
     @SubscribeMessage('event:join')
     async onJoin(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { eventId: number }) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             await this.events.assertCanView(dto.eventId, userId);
@@ -88,7 +112,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
 
     @SubscribeMessage('vote:cast')
     async onCastVote(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: CastVoteDto & { eventId: number }) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             const position =
@@ -109,7 +133,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         @ConnectedSocket() client: AuthedSocket,
         @MessageBody() dto: { eventId: number; trackId: number; latitude?: number; longitude?: number },
     ) {
-        const userId = client.data?.userId;
+        const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
             const position =
@@ -126,10 +150,9 @@ export class TrackVoteGateway implements OnGatewayConnection {
     }
 
     /**
-     * Chaque participant a son propre "myVote" par morceau : on ne peut donc
-     * pas diffuser un board unique a toute la room (ca ecraserait le myVote de
-     * chacun avec une version publique). On recalcule un board personnalise
-     * par socket connecte a la room.
+     * chaque participant a son propre myVote par morceau : un board unique
+     * diffuse a la room ecraserait celui de chacun par une version publique.
+     * d'ou un board recalcule par socket.
      */
     async broadcastBoard(eventId: number) {
         const room = eventRoomOf(eventId);
@@ -149,11 +172,9 @@ export class TrackVoteGateway implements OnGatewayConnection {
     }
 
     /**
-     * Arme un minuteur pour rejouer broadcastBoard() a la fin du morceau en
-     * cours : ca provoque un nouvel appel a getBoard/ensureAdvanced cote
-     * service, qui fait avancer la file toute seule et renvoie le resultat a
-     * la room. Idempotent : un nouvel appel remplace le minuteur precedent
-     * plutot que d'en empiler plusieurs.
+     * arme un minuteur qui rejoue broadcastBoard() a la fin du morceau : le
+     * getBoard/ensureAdvanced qui suit fait avancer la file tout seul.
+     * idempotent, un nouvel appel remplace le minuteur au lieu d'en empiler.
      */
     private scheduleTick(eventId: number, board: Board) {
         this.clearTick(eventId);
