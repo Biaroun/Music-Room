@@ -96,13 +96,17 @@ export class AuthService {
   async verifyGoogleToken(token: string): Promise<{ email: string; username: string }> {
     const client = new OAuth2Client();
 
+    // un id token porte l'audience du client qui l'a demande : android et ios
+    // pour un build natif, web pour le flux navigateur d'expo-auth-session
+    // (expo go et web). il faut donc accepter les trois.
     const audiences = [
-      this.config.get<string>('GOOGLE_CLIENT_ID_ANDROID')!,
-    ];
+      this.config.get<string>('GOOGLE_CLIENT_ID_ANDROID'),
+      this.config.get<string>('GOOGLE_CLIENT_ID_IOS'),
+      this.config.get<string>('GOOGLE_CLIENT_ID_WEB'),
+    ].filter((id): id is string => !!id);
 
-    const iosClientId = this.config.get<string>('GOOGLE_CLIENT_ID_IOS');
-    if (iosClientId) {
-      audiences.push(iosClientId);
+    if (!audiences.length) {
+      throw new UnauthorizedException('Google sign-in is not configured on this server');
     }
 
     const ticket = await client.verifyIdToken({

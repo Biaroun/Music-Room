@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast';
 import Screen from '../components/Screen';
 import Field from '../components/Field';
 import Button from '../components/Button';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 export default function LoginScreen({ navigation }: any) {
   const [login, setLogin] = useState('');
@@ -65,6 +66,8 @@ export default function LoginScreen({ navigation }: any) {
       />
 
       <Button title="Login" onPress={handleLogin} loading={loading} disabled={!canSubmit} style={styles.submit} />
+
+      <GoogleSignInButton label="Continue with Google" />
 
       <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={styles.link}>
         <Text style={[typography.caption, { color: colors.accent, fontWeight: '600' }]}>Forgot password?</Text>
