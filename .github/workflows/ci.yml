@@ -1,0 +1,104 @@
+name: CI
+
+# sujet V.8 : "agility, quality and continued integration".
+# la pipeline lance exactement ce que "make check" lance en local, pour qu'un
+# echec ici soit reproductible sur la machine de n'importe qui.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (types, build, tests, e2e)
+    runs-on: ubuntu-latest
+
+    # les tests e2e montent l'AppModule complet : il leur faut une vraie base
+    # et un vrai redis, pas des mocks
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: musicroom
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/musicroom
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci_secret_not_used_anywhere_else
+      APP_URL: http://localhost:3000
+      # passport-google-oauth20 refuse de s'instancier sans clientID :
+      # valeurs factices, aucune requete n'est faite vers google pendant les tests
+      GOOGLE_CLIENT_ID_WEB: ci-dummy-web.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET_WEB: ci-dummy-secret
+      GOOGLE_CALLBACK_URL_WEB: http://localhost:3000/auth/google/web/callback
+      GOOGLE_CLIENT_ID_ANDROID: ci-dummy-android.apps.googleusercontent.com
+      # doit rester vide : le test e2e verifie qu'un bruteforce finit en 429,
+      # ce qu'une allowlist non vide desactiverait
+      THROTTLE_ALLOWLIST: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Installer les dependances
+        working-directory: backend
+        run: npm ci
+
+      - name: Types
+        working-directory: backend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: backend
+        run: npm run build
+
+      - name: Tests unitaires
+        working-directory: backend
+        run: npx jest --ci
+
+      - name: Tests e2e
+        working-directory: backend
+        run: npx jest --config ./test/jest-e2e.json --ci --forceExit
+
+  mobile:
+    name: Mobile (types)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Installer les dependances
+        working-directory: mobile
+        run: npm ci
+
+      - name: Types
+        working-directory: mobile
+        run: npx tsc --noEmit
