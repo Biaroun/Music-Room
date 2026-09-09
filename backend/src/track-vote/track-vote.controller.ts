@@ -10,8 +10,8 @@ import { CastVoteDto } from './dto/cast-vote.dto';
 import { RetractVoteDto } from './dto/retract-vote.dto';
 import { ImportPlaylistDto } from './dto/import-playlist.dto';
 
-// REST = source de verite pour le premier chargement et repli si le socket ne
-// passe pas, meme role que ListeningController vis-a-vis de ListeningGateway.
+// rest sert au premier chargement et de repli si le socket ne passe pas, meme
+// role que ListeningController
 @ApiTags('track-vote')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)

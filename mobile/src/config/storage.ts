@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-// expo-secure-store n'existe pas sur le web → fallback localStorage.
+// expo-secure-store n'existe pas sur le web -> fallback localStorage.
 export const storage = {
   getItem: (key: string): Promise<string | null> =>
     Platform.OS === 'web'

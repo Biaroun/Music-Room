@@ -2,8 +2,8 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { User } from '../users/user.entity';
 import { Event } from './event.entity';
 
-// Invitation a sens unique : l'organisateur invite, pas de negociation
-// accepte/refuse comme pour Friendship. La ligne suffit a donner l'acces.
+// invitation a sens unique : pas de negociation accepte/refuse comme pour
+// Friendship, la ligne suffit a donner l'acces
 @Entity()
 @Unique(['event', 'invitee'])
 export class EventInvite {

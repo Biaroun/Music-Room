@@ -1,5 +1,4 @@
-// mobile/src/screens/PlaylistEditorScreen.tsx
-// Charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
+// charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,7 +31,7 @@ import {
 
 type Track = ApiPlaylistTrack;
 
-// Utilisé seulement quand le websocket ne passe pas, même cadence que RealtimeContext.
+// utilise seulement quand le websocket ne passe pas, meme cadence que RealtimeContext.
 const FALLBACK_POLL_MS = 20_000;
 
 function toPreviewTrack(tk: Track): PreviewTrack {
@@ -62,8 +61,8 @@ export default function PlaylistEditorScreen({ route }: any) {
   const [isPublic, setIsPublic] = useState(true);
   const [licenseMode, setLicenseMode] = useState<PlaylistLicenseMode>('open');
   const [tracks, setTracks] = useState<Track[]>([]);
-  // version du dernier état vu : renvoyée à chaque reorder pour que le serveur
-  // refuse le nôtre si quelqu'un a réordonné entre-temps
+  // version du dernier etat vu : renvoyee a chaque reorder pour que le serveur
+  // refuse le notre si quelqu'un a reordonne entre-temps
   const [version, setVersion] = useState(0);
   const [isOwner, setIsOwner] = useState(true);
   const [collaborators, setCollaborators] = useState<PlaylistCollaborator[]>([]);
@@ -74,8 +73,8 @@ export default function PlaylistEditorScreen({ route }: any) {
     return () => leavePlaylist(playlistId);
   }, [playlistId, joinPlaylist, leavePlaylist]);
 
-  // Le socket est la source temps réel ; ce chargement REST couvre le premier
-  // affichage et le cas où le websocket ne passe pas. C'est aussi lui qui donne
+  // le socket est la source temps reel ; ce chargement rest couvre le premier
+  // affichage et le cas ou le websocket ne passe pas. C'est aussi lui qui donne
   // isOwner, AuthContext n'exposant pas l'utilisateur courant.
   const loadFromRest = useCallback(() => {
     return getPlaylist(playlistId, token)
@@ -95,14 +94,14 @@ export default function PlaylistEditorScreen({ route }: any) {
     loadFromRest().finally(() => setLoading(false));
   }, [loadFromRest]);
 
-  // Repli : tant que le websocket ne passe pas, on interroge le REST.
+  // repli : tant que le websocket ne passe pas, on interroge le REST.
   useEffect(() => {
     if (connected) return;
     const id = setInterval(loadFromRest, FALLBACK_POLL_MS);
     return () => clearInterval(id);
   }, [connected, loadFromRest]);
 
-  // Un état poussé par le serveur fait toujours autorité sur l'état local.
+  // un etat pousse par le serveur fait toujours autorite sur l'etat local.
   useEffect(() => {
     if (!playlistState || playlistState.id !== playlistId) return;
     setName(playlistState.name);
@@ -136,7 +135,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     });
   }
 
-  // Axe distinct de la visibilité : qui a le droit d'éditer, pas qui peut lire.
+  // axe distinct de la visibilite : qui a le droit d'editer, pas qui peut lire.
   function toggleLicense() {
     const next: PlaylistLicenseMode = licenseMode === 'open' ? 'invite-only' : 'open';
     setLicenseMode(next);
@@ -146,7 +145,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     });
   }
 
-  // Deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche —
+  // deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche ,
   // on le recupere avant l'ajout, comme ca le backend a directement la bonne valeur.
   async function pickTrack(dt: DeezerTrack) {
     const bpm = dt.bpm ?? (await getTrackBpm(dt.id).catch(() => null));
@@ -160,7 +159,7 @@ export default function PlaylistEditorScreen({ route }: any) {
       bpm: bpm ?? undefined,
     };
     if (connected) {
-      // l'état revient par playlist:state, inutile de toucher tracks ici
+      // l'etat revient par playlist:state, inutile de toucher tracks ici
       addTrackRealtime(playlistId, dto);
       return;
     }
@@ -190,7 +189,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     if (j < 0 || j >= tracks.length) return;
     const copy = [...tracks];
     [copy[index], copy[j]] = [copy[j], copy[index]];
-    // optimiste : le broadcast (ou playlist:conflict) réconcilie juste après
+    // optimiste : le broadcast (ou playlist:conflict) reconcilie juste apres
     setTracks(copy);
 
     const ids = copy.map((tk) => tk.id);
@@ -198,8 +197,8 @@ export default function PlaylistEditorScreen({ route }: any) {
       reorderRealtime(playlistId, ids, version);
       return;
     }
-    // Repli REST : apiFetch ne remonte pas le statut HTTP, on ne peut pas
-    // distinguer un 409 d'une autre erreur — on recharge l'ordre du serveur.
+    // repli rest : apiFetch ne remonte pas le statut http, on ne peut pas
+    // distinguer un 409 d'une autre erreur , on recharge l'ordre du serveur.
     reorderPlaylistTracks(playlistId, token, ids, version)
       .then((state) => setVersion(state.version))
       .catch(() => {
@@ -447,7 +446,7 @@ const styles = StyleSheet.create({
     fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.8,
     padding: 0, outlineWidth: 0,
   },
-  // wrap : la ligne porte jusqu'à 5 chips (auteur, visibilité, licence, compte, offline)
+  // wrap : la ligne porte jusqu'a 5 chips (auteur, visibilite, licence, compte, offline)
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', rowGap: spacing.xs, marginTop: spacing.sm },
   meta: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   dot: { color: colors.textSecondary, fontSize: 13, marginHorizontal: spacing.xs },
@@ -466,7 +465,7 @@ const styles = StyleSheet.create({
   playFabHover: { backgroundColor: colors.accentHover },
   playFabOff: { opacity: 0.45 },
 
-  // paddingTop laisse passer la moitié du bouton play qui déborde de l'en-tête
+  // paddingTop laisse passer la moitie du bouton play qui deborde de l'en-tete
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.xs },
   row: {
     flexDirection: 'row', alignItems: 'center',

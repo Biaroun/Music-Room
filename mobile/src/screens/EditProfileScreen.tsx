@@ -1,4 +1,3 @@
-// mobile/src/screens/EditProfileScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -35,7 +34,7 @@ export default function EditProfileScreen({ navigation }: any) {
   const [bio, setBio] = useState('');
   const [genres, setGenres] = useState<MusicGenre[]>([]);
   const [visibility, setVisibility] = useState<Record<VisibilityField, Visibility>>({
-    // l'écoute en cours n'est de toute façon interrogeable que par les amis
+    // l'ecoute en cours n'est de toute facon interrogeable que par les amis
     username: 'public', bio: 'public', musicPreferences: 'public', listening: 'friends-only',
   });
   const [avatar, setAvatar] = useState<string | null>(null);

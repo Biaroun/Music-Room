@@ -92,7 +92,7 @@ describe('PlaylistEditorService', () => {
       await expect(service.assertCanEdit(10, OWNER)).rejects.toThrow(NotFoundException);
     });
 
-    // Sujet V.2.3 : "By default, everyone can edit the playlist."
+    // sujet v.2.3 : par defaut tout le monde peut editer la playlist
     it('lets any viewer edit a public playlist under the default open license', async () => {
       playlists.findOne.mockResolvedValue(basePlaylist({ isPublic: true }));
 
@@ -100,8 +100,8 @@ describe('PlaylistEditorService', () => {
       expect(collaborators.findOne).not.toHaveBeenCalled();
     });
 
-    // Les deux axes se composent : la licence ouverte ne contourne pas la
-    // visibilite, on ne peut pas editer ce qu'on n'a meme pas le droit de voir.
+    // les deux axes se composent : une licence ouverte ne contourne pas la
+    // visibilite, on n'edite pas ce qu'on n'a pas le droit de voir
     it('still rejects a stranger on a private playlist even under the open license', async () => {
       playlists.findOne.mockResolvedValue(basePlaylist({ isPublic: false }));
       collaborators.findOne.mockResolvedValue(null);
@@ -140,8 +140,8 @@ describe('PlaylistEditorService', () => {
   });
 
   describe('reorder', () => {
-    // La vraie methode passe par manager.transaction ; on execute le callback
-    // avec un EntityManager mocke pour tester la logique sans base.
+    // la vraie methode passe par manager.transaction : le callback est execute
+    // avec un EntityManager mocke, pour tester la logique sans base
     function runTransactionWith(em: any) {
       playlists.manager.transaction.mockImplementation((cb: any) => cb(em));
     }

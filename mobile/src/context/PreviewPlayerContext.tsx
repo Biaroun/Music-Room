@@ -33,7 +33,7 @@ type PreviewPlayerContextType = {
 
 const PreviewPlayerContext = createContext<PreviewPlayerContextType | null>(null);
 
-// 4s de fondu, tick toutes les 100ms — reste court vu qu'une preview ne fait que 30s.
+// 4s de fondu, tick toutes les 100ms , reste court vu qu'une preview ne fait que 30s.
 const CROSSFADE_SEC = 4;
 const CROSSFADE_TICK_MS = 100;
 // au dela de 8% d'ecart ca sonne bizarre meme avec pitch correction, donc on ne force pas.
@@ -41,9 +41,9 @@ const BPM_TOLERANCE = 0.08;
 const TRANSITIONS_SETTING_KEY = 'transitions_enabled';
 const VOLUME_SETTING_KEY = 'preview_volume';
 
-// Vitesse a appliquer au morceau qui arrive pour caler son bpm sur celui qui part.
+// vitesse a appliquer au morceau qui arrive pour caler son bpm sur celui qui part.
 // 70 et 140 bpm peuvent "matcher" en half-time, donc on teste le ratio direct, x2 et /2,
-// et on garde celui le plus proche de 1. Rien de bon dans les 8% -> null (fondu simple).
+// et on garde celui le plus proche de 1. rien de bon dans les 8% -> null (fondu simple).
 function computeSyncRate(outgoingBpm: number, incomingBpm: number): number | null {
   const raw = outgoingBpm / incomingBpm;
   const candidates = [raw, raw / 2, raw * 2];
@@ -52,8 +52,8 @@ function computeSyncRate(outgoingBpm: number, incomingBpm: number): number | nul
 }
 
 export function PreviewPlayerProvider({ children }: { children: React.ReactNode }) {
-  // Deux platines comme un DJ: pendant que l'une joue (le "front"), l'autre precharge le
-  // morceau suivant. Impossible d'avoir deux sons en meme temps avec un seul player.
+  // deux platines comme un DJ: pendant que l'une joue (le "front"), l'autre precharge le
+  // morceau suivant. impossible d'avoir deux sons en meme temps avec un seul player.
   const deckA = useAudioPlayer(null);
   const deckB = useAudioPlayer(null);
   const statusA = useAudioPlayerStatus(deckA);
@@ -65,7 +65,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   const [volume, setVolumeState] = useState(1);
 
   const queueRef = useRef<PreviewTrack[] | null>(null);
-  // Copies "toujours a jour" du state, pour que le listener audio (branche une seule fois
+  // copies "toujours a jour" du state, pour que le listener audio (branche une seule fois
   // plus bas) lise la vraie valeur au lieu d'une valeur figee au moment de sa creation.
   const activeTrackRef = useRef<PreviewTrack | null>(null);
   const frontKeyRef = useRef<'A' | 'B'>('A');
@@ -100,7 +100,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     storage.setItem(TRANSITIONS_SETTING_KEY, enabled ? '1' : '0').catch(() => {});
   }
 
-  // Applique tout de suite au deck audible (sauf pendant un fondu : le tick
+  // applique tout de suite au deck audible (sauf pendant un fondu : le tick
   // du fondu relit volumeRef a chaque pas, la nouvelle valeur y est prise en
   // compte automatiquement sans a-coup).
   function setVolume(v: number) {
@@ -128,7 +128,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     }
   }
 
-  // Annule un fondu en cours (skip manuel par exemple) et remet les deux decks au propre.
+  // annule un fondu en cours (skip manuel par exemple) et remet les deux decks au propre.
   function abortCrossfade(key: 'A' | 'B') {
     clearCrossfadeTimer();
     crossfadingRef.current = false;
@@ -139,7 +139,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     getDeck(otherKey).volume = volumeRef.current;
   }
 
-  // Lance un morceau depuis zero sur le deck donne (volume/vitesse remis a la normale avant).
+  // lance un morceau depuis zero sur le deck donne (volume/vitesse remis a la normale avant).
   function playAt(track: PreviewTrack, key: 'A' | 'B') {
     const deck = getDeck(key);
     deck.volume = volumeRef.current;
@@ -152,7 +152,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     crossfadeTriggeredForRef.current = null;
   }
 
-  // Fallback brutal, pas de fondu: transitions off, ou morceau fini avant d'avoir pu declencher.
+  // fallback brutal, pas de fondu: transitions off, ou morceau fini avant d'avoir pu declencher.
   function advanceHardCut() {
     const queue = queueRef.current;
     const current = activeTrackRef.current;
@@ -166,7 +166,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     }
   }
 
-  // Le coeur du fondu. outDeck descend, inDeck (charge le morceau suivant) monte. Un
+  // le coeur du fondu. outDeck descend, inDeck (charge le morceau suivant) monte. un
   // setInterval bouge les deux volumes a l'oppose a chaque tick jusqu'a 1, puis outDeck
   // est mis en pause et inDeck devient le nouveau front.
   function startCrossfade(current: PreviewTrack, next: PreviewTrack) {
@@ -209,8 +209,8 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     }, CROSSFADE_TICK_MS);
   }
 
-  // Appele a chaque update de statut d'un deck. On ignore ce qui vient du deck non-front,
-  // et ce qui arrive pendant un fondu deja en cours (il se termine tout seul). Deux cas
+  // appele a chaque update de statut d'un deck. on ignore ce qui vient du deck non-front,
+  // et ce qui arrive pendant un fondu deja en cours (il se termine tout seul). deux cas
   // interessants: le morceau vient de finir (hard cut de secours), ou il reste moins de
   // CROSSFADE_SEC avant la fin (on lance le fondu si transitions actives + morceau suivant).
   function handleStatusUpdate(key: 'A' | 'B', s: { currentTime: number; duration: number; didJustFinish: boolean }) {
@@ -236,9 +236,9 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     startCrossfade(current, next);
   }
 
-  // Listener natif plutot qu'un useEffect sur status.didJustFinish: react ne redeclenche
+  // listener natif plutot qu'un useEffect sur status.didJustFinish: react ne redeclenche
   // un effect que si la valeur change entre deux renders, donc un evenement pourrait se
-  // perdre. Le listener, lui, recoit chaque update une fois, sans dependre du render cycle.
+  // perdre. le listener, lui, recoit chaque update une fois, sans dependre du render cycle.
   useEffect(() => {
     const subA = deckA.addListener('playbackStatusUpdate', (s) => handleStatusUpdate('A', s));
     const subB = deckB.addListener('playbackStatusUpdate', (s) => handleStatusUpdate('B', s));
@@ -265,7 +265,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     playAt(track, frontKey);
   }
 
-  // Skip manuel = coupe toujours net, meme transitions activees. Le fondu c'est pour un
+  // skip manuel = coupe toujours net, meme transitions activees. le fondu c'est pour un
   // enchainement naturel, pas pour un clic ou l'utilisateur veut changer tout de suite.
   function next() {
     if (!hasNext || !queue) return;
@@ -286,8 +286,8 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     setActiveTrack(null);
   }
 
-  // On déclare au backend ce qu'on écoute, pour que nos amis le voient sur l'écran
-  // Amis. Une pause compte comme "plus rien en cours" : c'est ce que l'écran affiche.
+  // on declare au backend ce qu'on ecoute, pour que nos amis le voient sur l'ecran
+  // amis. une pause compte comme "plus rien en cours" : c'est ce que l'ecran affiche.
   const { reportListening } = useRealtime();
   const isPlaying = frontStatus.playing;
   useEffect(() => {

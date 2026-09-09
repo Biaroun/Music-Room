@@ -47,7 +47,7 @@ function IconButton({
 
 // PanResponder + measure() plutot que locationX de Pressable : locationX n'est
 // pas fiable sur react-native-web (peut remonter NaN), alors que gestureState
-// donne toujours des coordonnees page valides. Bonus : ca permet le glisser,
+// donne toujours des coordonnees page valides. bonus : ca permet le glisser,
 // pas juste le tap.
 function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
   const trackRef = useRef<View>(null);
@@ -112,7 +112,7 @@ export default function MiniPlayer() {
 
   if (!activeTrack) return null;
 
-  // sur téléphone la place manque : le temps passe à la trappe avant le titre
+  // sur telephone la place manque : le temps passe a la trappe avant le titre
   const showTime = width >= 480;
 
   const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;

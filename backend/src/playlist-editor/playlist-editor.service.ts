@@ -11,7 +11,7 @@ import { AddTrackDto } from './dto/add-track.dto';
 
 export type CollaboratorSummary = { id: number; username: string; avatar: string | null };
 
-/** Etat complet diffuse a la room par PlaylistEditorGateway. */
+/** etat complet diffuse a la room par PlaylistEditorGateway */
 export type PlaylistState = {
     id: number;
     name: string;
@@ -43,7 +43,7 @@ export class PlaylistEditorService {
     }
 
     async findMine(userId: number) {
-        // tracks charge juste pour le compteur affiche dans la liste cote mobile
+        // tracks charge juste pour le compteur affiche cote mobile
         const owned = await this.playlists.find({
             where: { owner: { id: userId } },
             relations: { tracks: true },
@@ -64,7 +64,7 @@ export class PlaylistEditorService {
               })
             : [];
 
-        // isOwner : le mobile masque renommage / visibilite / suppression dessus
+        // isOwner : le mobile masque renommage, visibilite et suppression dessus
         return [
             ...owned.map((playlist) => ({ ...playlist, isOwner: true })),
             ...shared.map((playlist) => ({ ...playlist, isOwner: false })),
@@ -95,8 +95,8 @@ export class PlaylistEditorService {
             .then((row) => !!row);
     }
 
-    // select restreint sur owner : sinon TypeORM renvoie tout l'entity User avec
-    // ses relations, tokens de reset/verif compris.
+    // select restreint sur owner : sinon typeorm renvoie tout le User, tokens
+    // de reset et de verification compris
     private async load(id: number): Promise<Playlist> {
         const playlist = await this.playlists.findOne({
             where: { id },
@@ -108,11 +108,10 @@ export class PlaylistEditorService {
     }
 
     /**
-     * Droit d'ecriture sur le contenu. Deux axes qui se composent, comme
-     * EventService.assertCanVote : d'abord la visibilite (on ne peut pas editer
-     * ce qu'on n'a pas le droit de voir), puis la licence. En licence OPEN
-     * (defaut du sujet) tout spectateur edite ; en INVITE_ONLY seuls le
-     * proprietaire et les collaborateurs invites.
+     * droit d'ecriture, deux axes qui se composent comme dans
+     * EventService.assertCanVote : d'abord la visibilite, on n'edite pas ce
+     * qu'on n'a pas le droit de voir, puis la licence. en OPEN tout spectateur
+     * edite, en INVITE_ONLY seuls le proprietaire et les invites.
      */
     async assertCanEdit(playlistId: number, userId: number): Promise<Playlist> {
         const playlist = await this.assertCanView(playlistId, userId);
@@ -122,7 +121,7 @@ export class PlaylistEditorService {
         throw new ForbiddenException('You are not an editor of this playlist');
     }
 
-    /** Droit de lecture : playlist publique, proprietaire, ou collaborateur. */
+    /** droit de lecture : playlist publique, proprietaire ou collaborateur */
     async assertCanView(playlistId: number, userId: number): Promise<Playlist> {
         const playlist = await this.load(playlistId);
         if (playlist.isPublic) return playlist;
@@ -143,9 +142,9 @@ export class PlaylistEditorService {
     }
 
     /**
-     * Etat diffuse a toute la room par le gateway. Identique pour tous les
-     * spectateurs (contrairement au board de track-vote qui porte un myVote par
-     * utilisateur), donc calcule une seule fois par diffusion.
+     * etat diffuse a toute la room. identique pour tous les spectateurs, au
+     * contraire du board de track-vote qui porte un myVote par utilisateur,
+     * donc calcule une seule fois par diffusion.
      */
     async getState(playlistId: number): Promise<PlaylistState> {
         const playlist = await this.playlists.findOne({
@@ -194,8 +193,8 @@ export class PlaylistEditorService {
         const user = await this.users.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
 
-        // idempotent : reinviter quelqu'un ne doit pas casser, la contrainte
-        // @Unique est la pour la base, pas pour l'appelant
+        // idempotent : reinviter ne doit pas casser, @Unique protege la base
+        // pas l'appelant
         const existing = await this.collaborators.findOne({
             where: { playlist: { id: playlistId }, collaborator: { id: userId } },
         });
@@ -221,17 +220,16 @@ export class PlaylistEditorService {
     async addTrack(playlistId: number, userId: number, dto: AddTrackDto) {
         const playlist = await this.assertCanEdit(playlistId, userId);
 
-        // Unicite par morceau Deezer et par playlist : le meme titre peut vivre
-        // dans plusieurs playlists, mais pas deux fois dans la meme. On compare
-        // sur deezerId et pas sur le titre, deux morceaux homonymes restant
-        // deux morceaux differents.
+        // unicite par deezerId et par playlist : le meme titre peut vivre dans
+        // plusieurs playlists mais pas deux fois dans la meme. compare sur
+        // l'id, deux homonymes restent deux morceaux differents
         const duplicate = await this.tracks.findOne({
             where: { playlist: { id: playlist.id }, deezerId: dto.deezerId },
         });
         if (duplicate) throw new ConflictException('This track is already in the playlist');
 
         const position = await this.tracks.count({ where: { playlist: { id: playlist.id } } });
-        // juste l'id pour la relation, pas besoin de renvoyer la playlist entiere dans la reponse
+        // juste l'id pour la relation, inutile de renvoyer toute la playlist
         const track = this.tracks.create({ ...dto, position, playlist: { id: playlist.id } as any });
         const saved = await this.tracks.save(track);
         await this.bumpVersion(playlist.id);
@@ -247,11 +245,11 @@ export class PlaylistEditorService {
     }
 
     /**
-     * expectedVersion absent = dernier ecrit gagne (compatibilite REST).
-     * Fourni, il attrape le cas que sameSet laisse passer : quelqu'un a
-     * reordonne pendant qu'on deplacait, meme jeu d'ids mais autre ordre.
-     * Le tout en transaction : un Promise.all d'updates pouvait laisser un
-     * ordre a moitie applique si une requete echouait.
+     * expectedVersion absent : dernier ecrit gagne, pour le repli rest. fourni,
+     * il attrape le cas que sameSet laisse passer, quelqu'un ayant reordonne
+     * pendant le deplacement avec le meme jeu d'ids.
+     * en transaction : un Promise.all d'updates pouvait laisser un ordre a
+     * moitie applique si une requete echouait.
      */
     async reorder(playlistId: number, userId: number, trackIds: number[], expectedVersion?: number) {
         await this.assertCanEdit(playlistId, userId);

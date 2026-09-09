@@ -44,7 +44,7 @@ describe('PlaylistEditorController', () => {
     expect(service.removeCollaborator).toHaveBeenCalledWith(10, 1, 2);
   });
 
-  // Sans ca une edition faite en repli REST resterait invisible des clients
+  // sans ca une edition faite en repli rest resterait invisible des clients
   // connectes en websocket.
   it('broadcasts to the room after a REST track add', async () => {
     await controller.addTrack({ id: 1 }, 10, { deezerId: 'd' } as any);

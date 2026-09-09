@@ -6,8 +6,8 @@ import { usePreviewPlayer } from '../context/PreviewPlayerContext';
 
 export const MINI_PLAYER_HEIGHT = 60;
 
-// Espace à réserver en bas d'un écran : encoche/barre système + mini-player quand il est là.
-// Sans ça le dernier élément d'une liste passe sous le lecteur.
+// espace a reserver en bas d'un ecran : encoche/barre systeme + mini-player quand il est la.
+// sans ca le dernier element d'une liste passe sous le lecteur.
 export function useBottomInset() {
   const insets = useSafeAreaInsets();
   const { activeTrack } = usePreviewPlayer();
@@ -16,9 +16,9 @@ export function useBottomInset() {
 
 type ScreenProps = {
   children: React.ReactNode;
-  /** false quand l'écran gère lui-même son scroll (FlatList par ex.) */
+  /** false quand l'ecran gere lui-meme son scroll (FlatList par ex.) */
   scroll?: boolean;
-  /** colonne étroite : formulaires d'authentification */
+  /** colonne etroite : formulaires d'authentification */
   narrow?: boolean;
   /** centre le contenu verticalement */
   center?: boolean;
@@ -27,10 +27,10 @@ type ScreenProps = {
   contentContainerStyle?: StyleProp<ViewStyle>;
 };
 
-// Conteneur commun à tous les écrans.
-// Son rôle principal : borner la largeur du contenu et le centrer. Sur téléphone la
-// contrainte ne s'applique jamais (l'écran est plus étroit), sur le web ça évite des
-// formulaires et des lignes de texte étirés sur 1500px.
+// conteneur commun a tous les ecrans.
+// son role principal : borner la largeur du contenu et le centrer. sur telephone la
+// contrainte ne s'applique jamais (l'ecran est plus etroit), sur le web ca evite des
+// formulaires et des lignes de texte etires sur 1500px.
 export default function Screen({
   children,
   scroll = true,
@@ -75,6 +75,6 @@ const styles = StyleSheet.create({
   columnFill: { flex: 1 },
   padded: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
   center: { justifyContent: 'center' },
-  // sans ScrollView il n'y a pas d'alignItems hérité : on centre sur les deux axes
+  // sans ScrollView il n'y a pas d'alignItems herite : on centre sur les deux axes
   centerBoth: { justifyContent: 'center', alignItems: 'center' },
 });

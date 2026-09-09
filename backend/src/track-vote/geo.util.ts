@@ -4,8 +4,8 @@ function toRadians(degrees: number): number {
     return (degrees * Math.PI) / 180;
 }
 
-// Distance en metres entre deux points (lat/lng en degres). Suffisant pour un
-// controle "suis-je dans un rayon de X metres" : pas besoin de PostGIS pour ca.
+// distance en metres entre deux points en degres. suffisant pour un controle
+// de rayon, pas besoin de postgis
 export function haversineDistanceMeters(
     a: { latitude: number; longitude: number },
     b: { latitude: number; longitude: number },

@@ -57,9 +57,8 @@ describe('TrackVoteService', () => {
     };
     eventService = { findOne: jest.fn() };
     playlists = { findOne: jest.fn() };
-    // Petit cache en memoire (pas juste un mock statique) : ensureAdvanced
-    // fait un cache.set puis buildNowPlaying refait un cache.get juste apres,
-    // il faut donc que la valeur ecrite soit relue, comme un vrai cache.
+    // vrai petit cache en memoire et pas un mock statique : ensureAdvanced
+    // ecrit puis buildNowPlaying relit juste apres
     const store = new Map<string, unknown>();
     cache = {
       get: jest.fn((key: string) => Promise.resolve(store.get(key))),
@@ -204,7 +203,7 @@ describe('TrackVoteService', () => {
 
       const board = await service.getPublicBoard(10);
 
-      // track 1 and 2 tie at 3 votes -> tiebreak keeps original position order (1 before 2)
+      // egalite a 3 votes : le depart se fait sur la position d'origine
       expect(board.tracks.map((t) => t.trackId)).toEqual([1, 2, 3]);
       expect(board.tracks[2]).toMatchObject({ trackId: 3, voteCount: 0 });
     });
@@ -227,7 +226,7 @@ describe('TrackVoteService', () => {
         { id: 2, deezerId: 'b', title: 'B', artist: 'x', cover: null, previewUrl: 'u2', position: 1 },
       ]);
       emptyVotes();
-      // store vide au depart : premier get -> undefined, comme un event tout neuf
+      // store vide au depart, comme un event tout neuf
 
       const board = await service.getPublicBoard(10);
 
@@ -260,8 +259,8 @@ describe('TrackVoteService', () => {
         { id: 2, deezerId: 'b', title: 'B', artist: 'x', cover: null, previewUrl: 'u2', position: 1 },
       ]);
       emptyVotes();
-      // seul le premier get (dans ensureAdvanced) doit voir l'etat perime ;
-      // le second (dans buildNowPlaying) doit relire ce qu'ensureAdvanced vient d'ecrire
+      // seul le premier get voit l'etat perime, le second doit relire ce
+      // qu'ensureAdvanced vient d'ecrire
       cache.get.mockResolvedValueOnce({ trackId: 1, startedAt: Date.now() - (PREVIEW_DURATION_MS + 1000) });
 
       const board = await service.getPublicBoard(10);
@@ -282,7 +281,7 @@ describe('TrackVoteService', () => {
 
       await service.getPublicBoard(10);
 
-      // affected=0 => un autre appel a deja gagne la course : on ne relance pas de choix ici
+      // affected=0 : un autre appel a gagne la course, pas de nouveau choix
       expect(cache.set).not.toHaveBeenCalled();
       expect(cache.del).not.toHaveBeenCalled();
     });

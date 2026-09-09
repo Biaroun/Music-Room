@@ -15,7 +15,7 @@ export class UsersController {
                 private friendshipService: FriendshipService) {}
 
 
-    // doit rester declaree AVANT @Get(':id'), sinon /users/search tombe dans :id
+    // a garder declaree avant @Get(':id'), sinon /users/search tombe dans :id
     @ApiOperation({ summary: 'Search or list users by username' })
     @ApiResponse({ status: 200, description: 'Users matching the query (all users if q is empty)' })
     @UseGuards(JwtAuthGuard)

@@ -9,8 +9,8 @@ import { ListeningGateway } from './listening.gateway';
 @Module({
   imports: [
     FriendshipModule,
-    // AuthModule n'exporte pas JwtModule : on le réenregistre avec le même secret
-    // pour que le gateway puisse vérifier le token de la poignée de main.
+    // AuthModule n'exporte pas JwtModule : reenregistre avec le meme secret
+    // pour que le gateway verifie le token du handshake
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

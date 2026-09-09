@@ -17,10 +17,10 @@ export type ApiEvent = {
   licenseEndsAt: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Mon statut sur cet event, calcule par le backend (voir EventService.findVisible/findOneForUser). */
+  /** mon statut sur cet event, calcule par le backend (voir EventService.findVisible/findOneForUser). */
   isOwner: boolean;
   isInvited: boolean;
-  /** Sans tenir compte de la position : juste un indicatif d'affichage, pas une autorisation. */
+  /** sans tenir compte de la position : juste un indicatif d'affichage, pas une autorisation. */
   canVote: boolean;
 };
 
