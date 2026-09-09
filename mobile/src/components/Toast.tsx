@@ -45,8 +45,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToast((t) => ({ ...t, visible: false }));
   }
 
-  // On anime l'entrée/sortie plutôt que d'apparaître d'un coup : un toast qui surgit
-  // sans transition passe souvent inaperçu.
+  // on anime l'entree/sortie plutot que d'apparaitre d'un coup : un toast qui surgit
+  // sans transition passe souvent inapercu.
   useEffect(() => {
     Animated.timing(anim, {
       toValue: toast.visible ? 1 : 0,
@@ -65,7 +65,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <View style={{ flex: 1 }}>
         {children}
         {toast.visible && (
-          // en haut : le bas de l'écran est déjà pris par le mini-player et les FAB
+          // en haut : le bas de l'ecran est deja pris par le mini-player et les fab
           <View style={[styles.wrap, { top: insets.top + spacing.md }]}>
             <Animated.View
               style={[
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     right: spacing.md,
     alignItems: 'center',
     zIndex: 999,
-    // box-none : le toast ne doit pas bloquer les clics sur l'écran en dessous
+    // box-none : le toast ne doit pas bloquer les clics sur l'ecran en dessous
     pointerEvents: 'box-none',
   },
   toast: {

@@ -1,9 +1,9 @@
 import { ImageSourcePropType } from 'react-native';
 
-// Set d'avatars prédéfinis (images bundlées).
-// Les images vivent dans mobile/assets/avatars/ (ici en .jpg).
-// NB: en React Native, chaque image doit être require() en dur (pas de chemin dynamique),
-// et l'extension doit correspondre exactement au fichier (.jpg ≠ .jpeg ≠ .png).
+// set d'avatars predefinis (images bundlees).
+// les images vivent dans mobile/assets/avatars/ (ici en .jpg).
+// en react native chaque image doit etre require() en dur, pas de chemin dynamique,
+// et l'extension doit correspondre exactement au fichier (.jpg = .jpeg = .png).
 export type Avatar = { id: string; source: ImageSourcePropType };
 
 export const AVATARS: Avatar[] = [

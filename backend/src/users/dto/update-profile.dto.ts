@@ -10,7 +10,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import {MusicGenre, Visibility, VisibilitySettings} from "../user.entity";
 
-// doit rester en phase avec mobile/src/config/avatars.ts (pas de package partage entre back et mobile)
+// a garder en phase avec mobile/src/config/avatars.ts, pas de package partage
 export const AVATAR_IDS = [
     'avatar-1', 'avatar-2', 'avatar-3', 'avatar-4',
     'avatar-5', 'avatar-6', 'avatar-7', 'avatar-8',
@@ -29,8 +29,8 @@ export class VisibilitySettingsDto {
     @IsOptional()
     musicPreferences?: Visibility;
 
-    // Sans ce champ, whitelist:true du ValidationPipe global le supprimerait
-    // silencieusement de la requête.
+    // sans ce champ, whitelist:true du ValidationPipe le supprimerait
+    // silencieusement de la requete
     @IsEnum(Visibility)
     @IsOptional()
     listening?: Visibility;
@@ -44,9 +44,6 @@ export class UpdateProfileDto {
     @IsString()
     @MaxLength(255, { message: "La bio est trop longue." })
     @IsOptional()
-/*    @Matches(/^[a-zA-Z0-9 .,!?'_-]+$/, {
-        message: "La bio contient des caractères non autorisés"
-    })*/
     bio?: string;
 
     @ApiProperty({

@@ -13,7 +13,7 @@ export type ApiPlaylistTrack = {
   addedAt: string;
 };
 
-/** Qui peut éditer, indépendamment de isPublic qui ne règle que la lecture. */
+/** qui peut editer, independamment de isPublic qui ne regle que la lecture. */
 export type PlaylistLicenseMode = 'open' | 'invite-only';
 
 export type ApiPlaylist = {
@@ -24,7 +24,7 @@ export type ApiPlaylist = {
   version: number;
   owner: { id: number; username: string };
   tracks?: ApiPlaylistTrack[];
-  /** false quand la playlist m'est partagée : le mobile masque les actions owner-only */
+  /** false quand la playlist m'est partagee : le mobile masque les actions owner-only */
   isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -36,7 +36,7 @@ export type PlaylistCollaborator = {
   avatar: string | null;
 };
 
-/** État complet poussé par la gateway sur playlist:state. */
+/** etat complet pousse par la gateway sur playlist:state. */
 export type PlaylistState = {
   id: number;
   name: string;
@@ -91,8 +91,8 @@ export function removeTrackFromPlaylist(playlistId: number, trackId: number, tok
   return apiFetch(`/playlist-editor/${playlistId}/tracks/${trackId}`, token, { method: 'DELETE' });
 }
 
-// version = celle du dernier état vu. Le backend refuse en 409 si quelqu'un a
-// réordonné entre-temps, plutôt que d'écraser son ordre en silence.
+// version = celle du dernier etat vu. le backend refuse en 409 si quelqu'un a
+// reordonne entre-temps, plutot que d'ecraser son ordre en silence.
 export function reorderPlaylistTracks(
   playlistId: number,
   token: string | null,

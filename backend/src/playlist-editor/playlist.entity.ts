@@ -2,9 +2,8 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, Pri
 import { User } from '../users/user.entity';
 import { PlaylistTrack } from './playlist-track.entity';
 
-// Sujet V.2.3 : "By default, everyone can edit the playlist" / "With the right
-// license, the invited users are the only ones who can edit". Axe distinct de
-// isPublic, qui ne regle que l'acces en lecture (meme separation que Event).
+// sujet v.2.3 : par defaut tout le monde edite, sous licence invite-only seuls
+// les invites editent. axe distinct de isPublic, qui ne regle que la lecture
 export enum PlaylistLicenseMode {
     OPEN = 'open',
     INVITE_ONLY = 'invite-only',
@@ -24,9 +23,8 @@ export class Playlist {
     @Column({ type: 'enum', enum: PlaylistLicenseMode, default: PlaylistLicenseMode.OPEN })
     licenseMode: PlaylistLicenseMode;
 
-    // Incremente a la main par chaque mutation de contenu. @VersionColumn ne
-    // conviendrait pas : add/removeTrack sauvegardent un PlaylistTrack, jamais
-    // la Playlist, donc la version ne bougerait pas.
+    // incremente a la main a chaque mutation. @VersionColumn ne marcherait pas :
+    // add/removeTrack sauvegardent un PlaylistTrack, jamais la Playlist
     @Column({ type: 'int', default: 0 })
     version: number;
 

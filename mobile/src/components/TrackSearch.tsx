@@ -111,7 +111,7 @@ export default function TrackSearch({
                     <Ionicons name={isCurrent && isPlaying ? "pause" : "play"} size={16} color={colors.accent} />
                   </Pressable>
                 ) : (
-                  // Deezer ne fournit pas toujours l'extrait de 30s
+                  // deezer ne fournit pas toujours l'extrait de 30s
                   <Text style={styles.noPreview}>No preview</Text>
                 )}
                 {onSelect && <Ionicons name="add-circle" size={22} color={colors.accent} />}

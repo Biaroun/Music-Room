@@ -7,13 +7,13 @@ type PressableCardProps = {
   onPress?: () => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
-  /** par défaut : la surface s'éclaircit au survol */
+  /** par defaut : la surface s'eclaircit au survol */
   hoverStyle?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 };
 
-// Ligne / tuile cliquable. Regroupe le survol (web) et l'appui (mobile) au même endroit
-// pour que toutes les listes de l'app réagissent pareil.
+// ligne / tuile cliquable. regroupe le survol (web) et l'appui (mobile) au meme endroit
+// pour que toutes les listes de l'app reagissent pareil.
 export default function PressableCard({
   children,
   onPress,

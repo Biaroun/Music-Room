@@ -24,8 +24,8 @@ type ButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-// Bouton unique de l'app : gère survol (web), appui, désactivé et chargement.
-// Avant chaque écran refaisait son propre TouchableOpacity sans aucun de ces états.
+// bouton unique de l'app : gere survol (web), appui, desactive et chargement.
+// avant chaque ecran refaisait son propre TouchableOpacity sans aucun de ces etats.
 export default function Button({
   title,
   onPress,

@@ -16,9 +16,8 @@ import { PlaylistTrack } from '../playlist-editor/playlist-track.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Event, EventInvite, Vote, Playlist, PlaylistTrack]),
-    // AuthModule n'exporte pas JwtModule : on le reenregistre avec le meme
-    // secret pour que le gateway puisse verifier le token de la poignee de main
-    // (meme pattern que ListeningModule).
+    // AuthModule n'exporte pas JwtModule : reenregistre avec le meme secret
+    // pour que le gateway verifie le token du handshake
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

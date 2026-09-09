@@ -35,7 +35,7 @@ export class Event {
     @Column({ type: 'enum', enum: EventLicenseMode, default: EventLicenseMode.OPEN })
     licenseMode: EventLicenseMode;
 
-    // Uniquement renseignes quand licenseMode = GEO_TIME_RESTRICTED
+    // renseignes uniquement quand licenseMode vaut GEO_TIME_RESTRICTED
     @Column({ type: 'float', nullable: true })
     licenseLatitude: number | null;
 

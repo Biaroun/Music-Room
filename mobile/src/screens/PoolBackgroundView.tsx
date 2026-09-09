@@ -29,7 +29,7 @@ half4 main(float2 fragCoord) {
     float vm = min(u_resolution.x, u_resolution.y);
     float t = u_time;
 
-    // Degrade radial profond (deep pool)
+    // degrade radial profond (deep pool)
     float dist = distance(fragCoord, float2(center.x, center.y * 0.88))
                  / (max(u_resolution.x, u_resolution.y) * 0.95);
     dist = clamp(dist, 0.0, 1.0);
@@ -38,7 +38,7 @@ half4 main(float2 fragCoord) {
     float3 c3 = float3(0.012, 0.051, 0.114); // #030d1d
     float3 col = dist < 0.5 ? mix(c1, c2, dist / 0.5) : mix(c2, c3, (dist - 0.5) / 0.5);
 
-    // Grille de carrelage qui derive lentement
+    // grille de carrelage qui derive lentement
     float ts = vm * 0.09;
     float2 g = abs(fract((fragCoord + float2(t * 0.38, t * 0.22)) / ts) - 0.5);
     float line = smoothstep(0.0, 0.03, min(g.x, g.y));
@@ -69,7 +69,7 @@ half4 main(float2 fragCoord) {
         col += float3(0.92, 0.99, 1.0) * fall * fall * ha * 3.2;
     }
 
-    // Vignette
+    // vignette
     float vd = distance(fragCoord, center) / (max(u_resolution.x, u_resolution.y) * 0.75);
     vd = clamp((vd - 0.4) / 0.6, 0.0, 1.0);
     col = mix(col, float3(0.004, 0.020, 0.055), vd * 0.7);

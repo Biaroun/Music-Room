@@ -30,7 +30,7 @@ function nowPlayingToPreviewTrack(np: VoteNowPlaying): PreviewTrack {
   return { id: String(np.trackId), title: np.title, artist: np.artist, cover: np.cover, previewUrl: np.previewUrl };
 }
 
-// Repli REST tant que le websocket ne passe pas (même seuil que RealtimeContext).
+// repli rest tant que le websocket ne passe pas (meme seuil que RealtimeContext).
 const FALLBACK_POLL_MS = 20_000;
 
 export default function TrackVoteScreen({ route, navigation }: any) {
@@ -50,7 +50,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
   const [importing, setImporting] = useState(false);
   const locationDeniedRef = useRef(false);
 
-  // Lecture partagee : une fois qu'on a rejoint, chaque changement de morceau
+  // lecture partagee : une fois qu'on a rejoint, chaque changement de morceau
   // "en cours" est relance automatiquement via le lecteur global de l'app
   // (meme lecteur que TrackSearch/PlaylistEditor, visible dans le MiniPlayer).
   const [listeningAlong, setListeningAlong] = useState(false);
@@ -89,12 +89,12 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }, [eventId, token]),
   );
 
-  // Le board temps réel remplace le board REST dès qu'il arrive.
+  // le board temps reel remplace le board rest des qu'il arrive.
   useEffect(() => {
     if (voteBoard) setBoard(voteBoard);
   }, [voteBoard]);
 
-  // Repli : tant que le socket ne passe pas, on interroge le REST.
+  // repli : tant que le socket ne passe pas, on interroge le REST.
   useEffect(() => {
     if (connected) return;
     const id = setInterval(() => {
@@ -103,7 +103,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     return () => clearInterval(id);
   }, [connected, eventId, token]);
 
-  // Des qu'on a rejoint l'ecoute, chaque nouveau morceau "en cours" (vote qui
+  // des qu'on a rejoint l'ecoute, chaque nouveau morceau "en cours" (vote qui
   // change le classement, ou fin naturelle du morceau precedent) relance la
   // lecture automatiquement.
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     togglePlayback(nowPlayingToPreviewTrack(board.nowPlaying));
   }, [listeningAlong, board?.nowPlaying?.trackId]);
 
-  // Le premier appui est le "geste utilisateur" requis par les navigateurs
+  // le premier appui est le "geste utilisateur" requis par les navigateurs
   // pour autoriser la lecture audio ; les changements suivants heritent de
   // cette autorisation tant que la page reste ouverte.
   function joinListening() {
@@ -144,7 +144,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }
   }
 
-  // On peut voter pour plusieurs morceaux differents, mais une seule fois
+  // on peut voter pour plusieurs morceaux differents, mais une seule fois
   // chacun : appuyer sur un morceau deja vote retire le vote (toggle).
   async function toggleVote(track: VoteBoardTrack) {
     setVoting(track.trackId);
@@ -420,7 +420,7 @@ function NowPlayingCard({
         {!listeningAlong ? (
           <Button title="Listen" icon="play" size="sm" fullWidth={false} onPress={onJoin} />
         ) : (
-          // Le volume se regle depuis le lecteur en bas de l'app (MiniPlayer) :
+          // le volume se regle depuis le lecteur en bas de l'app (MiniPlayer) :
           // c'est le meme lecteur partage, pas la peine de dupliquer le controle ici.
           <Ionicons
             name={isPlaying ? 'volume-high' : 'volume-mute'}

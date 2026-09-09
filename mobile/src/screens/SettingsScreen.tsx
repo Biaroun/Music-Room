@@ -63,7 +63,7 @@ export default function SettingsScreen({ navigation }: any) {
     finally { setSavingPwd(false); }
   }
 
-  // Validation affichée pendant la saisie plutôt qu'en pop-up après coup.
+  // validation affichee pendant la saisie plutot qu'en pop-up apres coup.
   const weakPwd = newPwd.length > 0 && !PASSWORD_RULE.test(newPwd);
   const mismatch = newPwdConfirm.length > 0 && newPwd !== newPwdConfirm;
   const pwdFormValid = !!curPwd && PASSWORD_RULE.test(newPwd) && newPwd === newPwdConfirm;

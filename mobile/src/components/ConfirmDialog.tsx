@@ -14,9 +14,9 @@ type ConfirmDialogProps = {
   onCancel: () => void;
 };
 
-// Remplace Alert.alert pour les confirmations : Alert est un no-op complet sur
-// react-native-web, donc la boîte ne s'affichait jamais côté web et l'action
-// n'était jamais déclenchée.
+// remplace Alert.alert pour les confirmations : alert est un no-op complet sur
+// react-native-web, donc la boite ne s'affichait jamais cote web et l'action
+// n'etait jamais declenchee.
 export default function ConfirmDialog({
   visible,
   title,

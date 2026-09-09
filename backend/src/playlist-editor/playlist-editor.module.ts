@@ -13,9 +13,8 @@ import { User } from '../users/user.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Playlist, PlaylistTrack, PlaylistCollaborator, User]),
-    // AuthModule n'exporte pas JwtModule : on le reenregistre avec le meme
-    // secret pour que le gateway puisse verifier le token de la poignee de main
-    // (meme pattern que TrackVoteModule).
+    // AuthModule n'exporte pas JwtModule : reenregistre avec le meme secret
+    // pour que le gateway verifie le token du handshake, comme TrackVoteModule
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

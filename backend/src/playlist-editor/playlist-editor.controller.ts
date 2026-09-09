@@ -10,10 +10,9 @@ import { AddTrackDto } from './dto/add-track.dto';
 import { ReorderTracksDto } from './dto/reorder-tracks.dto';
 import { AddCollaboratorDto } from './dto/add-collaborator.dto';
 
-// REST = source de verite pour le premier chargement et repli si le socket ne
-// passe pas, meme role que TrackVoteController vis-a-vis de TrackVoteGateway.
-// Chaque mutation rediffuse a la room, sinon une edition faite en repli REST
-// resterait invisible des clients connectes en websocket.
+// rest sert au premier chargement et de repli si le socket ne passe pas, meme
+// role que TrackVoteController. chaque mutation rediffuse a la room, sinon une
+// edition faite en repli resterait invisible des clients en websocket
 @ApiTags('playlist-editor')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)

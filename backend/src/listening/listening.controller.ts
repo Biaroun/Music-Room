@@ -5,9 +5,9 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ListeningService, HEARTBEAT_INTERVAL_MS, NOW_PLAYING_TTL_MS } from './listening.service';
 import { UpdateListeningDto } from './dto/update-listening.dto';
 
-// Pendant REST du gateway : premier chargement et repli quand le socket ne passe pas
-// (proxy d'entreprise, réseau qui bloque le websocket...). Le sujet demande une API REST
-// documentée, la fonctionnalité doit donc rester utilisable sans temps réel.
+// pendant rest du gateway : premier chargement et repli quand le socket ne
+// passe pas. le sujet demande une api rest documentee, la fonctionnalite doit
+// rester utilisable sans temps reel
 @ApiTags('listening')
 @ApiBearerAuth()
 @Controller('listening')

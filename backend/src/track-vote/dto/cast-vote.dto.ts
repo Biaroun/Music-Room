@@ -6,7 +6,7 @@ export class CastVoteDto {
     @IsInt()
     trackId: number;
 
-    // Requis uniquement si la licence de l'event est geo-time-restricted ; le
+    // requis uniquement si la licence de l'event est geo-time-restricted, le
     // controle se fait dans le service car il depend de la licence de l'event,
     // pas du DTO seul.
     @ApiProperty({ required: false })

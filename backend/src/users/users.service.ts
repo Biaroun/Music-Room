@@ -52,8 +52,8 @@ export class UsersService {
     });
   }
 
-  // q vide => on liste tout le monde (sauf soi), utilise par la page Amis pour
-  // afficher les "inconnus" ; q rempli => filtre sur le username.
+  // q vide : liste tout le monde sauf soi, ce qui alimente les inconnus de la
+  // page amis. q rempli : filtre sur le username
   async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
     const qb = this.userRepository
       .createQueryBuilder('user')
