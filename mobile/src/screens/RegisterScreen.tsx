@@ -28,7 +28,7 @@ export default function RegisterScreen({ navigation }: any) {
         method: 'POST',
         body: JSON.stringify({ username, email, password, passwordConfirm }),
       });
-      showToast({ type: 'success', message: 'Account created! Please log in.' });
+      showToast({ type: 'success', message: 'Account created! A verification link was sent to your inbox.' });
       navigation.navigate('Login', { email });
     } catch (e: any) {
       showToast({ type: 'error', message: e.message });

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FriendshipController } from './friendship.controller';
 import { FriendshipService } from './friendship.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('FriendshipController', () => {
   let controller: FriendshipController;
@@ -22,7 +23,10 @@ describe('FriendshipController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FriendshipController],
       providers: [{ provide: FriendshipService, useValue: friendshipService }],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<FriendshipController>(FriendshipController);
   });

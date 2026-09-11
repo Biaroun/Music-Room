@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PlaylistEditorController } from './playlist-editor.controller';
 import { PlaylistEditorService } from './playlist-editor.service';
 import { PlaylistEditorGateway } from './playlist-editor.gateway';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('PlaylistEditorController', () => {
   let controller: PlaylistEditorController;
@@ -25,7 +26,10 @@ describe('PlaylistEditorController', () => {
         { provide: PlaylistEditorService, useValue: service },
         { provide: PlaylistEditorGateway, useValue: gateway },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<PlaylistEditorController>(PlaylistEditorController);
   });

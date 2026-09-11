@@ -3,9 +3,11 @@ import { FriendshipService } from './friendship.service';
 import { FriendshipController } from './friendship.controller';
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {Friendship} from "./friendship.entity";
+import {User} from "../users/user.entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Friendship])],
+  // User : JwtAuthGuard en a besoin pour le controle emailisVerified
+  imports: [TypeOrmModule.forFeature([Friendship, User])],
   providers: [FriendshipService],
   controllers: [FriendshipController],
   exports: [FriendshipService],
