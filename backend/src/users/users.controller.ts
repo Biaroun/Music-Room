@@ -45,6 +45,10 @@ export class UsersController {
             avatar: fulluser.avatar,
             visibilitySettings: fulluser.visibilitySettings,
             oAuthProvider: fulluser.oAuthProvider,
+            // null si aucun compte google n'est lie
+            googleEmail: fulluser.googleEmail ?? null,
+            // un compte google sans mot de passe ne peut pas delier google
+            hasPassword: !!fulluser.password,
             createdAt: fulluser.createdAt,
             updatedAt: fulluser.updatedAt,
         };
