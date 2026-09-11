@@ -27,7 +27,7 @@ const PS_SZ = 46;   // pending envoyee
 const OT_SZ = 44;
 const GREEN = '#1DB954';
 const AMBER = '#f59e0b';
-// versions rgb : boxShadow a besoin de la couleur et de l'opacité dans la même valeur
+// versions rgb : boxShadow a besoin de la couleur et de l'opacite dans la meme valeur
 const GREEN_RGB = '29,185,84';
 const AMBER_RGB = '245,158,11';
 const COLORS = ['#e91e63',

@@ -1,10 +1,10 @@
 import {ConflictException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './user.entity';
+import { GoogleIdentity, User } from './user.entity';
 import { RegisterDto } from '../auth/dto/register.dto';
 import {UpdateProfileDto} from "./dto/update-profile.dto";
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 import {UpdateEmailDto} from "./dto/update-email.dto";
 import * as bcrypt from "bcrypt";
 import {MailService} from "../mail/mail.service";
@@ -40,6 +40,7 @@ export class UsersService {
         password: true,
         emailisVerified: true,
         oAuthProvider: true,
+        googleEmail: true,
         bio: true,
         avatar: true,
         musicpreferences: true,
@@ -54,8 +55,8 @@ export class UsersService {
     });
   }
 
-  // q vide => on liste tout le monde (sauf soi), utilise par la page Amis pour
-  // afficher les "inconnus" ; q rempli => filtre sur le username.
+  // q vide : liste tout le monde sauf soi, ce qui alimente les inconnus de la
+  // page amis. q rempli : filtre sur le username
   async searchByUsername(query: string, excludeUserId: number): Promise<User[]> {
     const qb = this.userRepository
       .createQueryBuilder('user')
@@ -69,6 +70,46 @@ export class UsersService {
     }
 
     return qb.getMany();
+  }
+
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    if (!googleId)
+      return null;
+    return await this.userRepository.findOne({ where: { googleId } });
+  }
+
+  // lie une identite google a un compte. si google prouve la meme adresse que
+  // celle du compte, ca vaut validation du mail
+  async attachGoogle(user: Pick<User, 'id' | 'email'>, identity: GoogleIdentity): Promise<void> {
+    const sameEmail = !!user.email && user.email.toLowerCase() === identity.email.toLowerCase();
+    await this.userRepository.update(user.id, {
+      googleId: identity.googleId,
+      googleEmail: identity.email,
+      ...(sameEmail ? { emailisVerified: true } : {}),
+    });
+  }
+
+  async detachGoogle(userId: number): Promise<void> {
+    await this.userRepository.update(userId, { googleId: null, googleEmail: null });
+  }
+
+  // le nom affiche par google ("Bob Martin") ne respecte pas la regle des
+  // usernames, et deux homonymes feraient sauter la contrainte unique
+  async availableUsername(displayName: string): Promise<string> {
+    const base = (displayName ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 30) || 'user';
+
+    let candidate = base;
+    for (let i = 0; i < 5; i++) {
+      if (!await this.isAlreadyExist('username', candidate))
+        return candidate;
+      candidate = `${base}_${randomInt(1000, 10000)}`;
+    }
+    return `${base}_${randomBytes(4).toString('hex')}`;
   }
 
   async create(data: Partial<User>): Promise<User> {
@@ -99,6 +140,9 @@ export class UsersService {
   }
 
   async verifyEmailToken(token: string) {
+    // sans ce garde, typeorm ignore la condition et renvoie le premier user
+    if (!token)
+      return false;
     const user = await this.userRepository.findOne({
       where: { emailVerificationToken: token }
     });
@@ -127,7 +171,19 @@ export class UsersService {
     return token;
   }
 
+  // la page du lien mail verifie le token avant d'afficher le formulaire
+  async isPasswordResetTokenValid(token: string): Promise<boolean> {
+    if (!token)
+      return false;
+    const user = await this.userRepository.findOne({
+      where: { passwordResetToken: token }
+    });
+    return !!user?.passwordResetExpires && user.passwordResetExpires >= new Date();
+  }
+
   async verifyPasswordResetToken(token: string, newpassword: string) {
+    if (!token)
+      return false;
     const user = await this.userRepository.findOne({
       where: { passwordResetToken: token }
     });

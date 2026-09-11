@@ -1,16 +1,20 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { FriendshipModule } from '../friendship/friendship.module';
 import { ListeningService } from './listening.service';
 import { ListeningController } from './listening.controller';
 import { ListeningGateway } from './listening.gateway';
+import { User } from '../users/user.entity';
 
 @Module({
   imports: [
     FriendshipModule,
-    // AuthModule n'exporte pas JwtModule : on le réenregistre avec le même secret
-    // pour que le gateway puisse vérifier le token de la poignée de main.
+    // JwtAuthGuard verifie emailisVerified directement en base
+    TypeOrmModule.forFeature([User]),
+    // AuthModule n'exporte pas JwtModule : reenregistre avec le meme secret
+    // pour que le gateway verifie le token du handshake
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

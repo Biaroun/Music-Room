@@ -3,17 +3,25 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { PlaylistEditorService } from './playlist-editor.service';
+import { PlaylistEditorGateway } from './playlist-editor.gateway';
 import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddTrackDto } from './dto/add-track.dto';
 import { ReorderTracksDto } from './dto/reorder-tracks.dto';
+import { AddCollaboratorDto } from './dto/add-collaborator.dto';
 
+// rest sert au premier chargement et de repli si le socket ne passe pas, meme
+// role que TrackVoteController. chaque mutation rediffuse a la room, sinon une
+// edition faite en repli resterait invisible des clients en websocket
 @ApiTags('playlist-editor')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('playlist-editor')
 export class PlaylistEditorController {
-    constructor(private readonly service: PlaylistEditorService) {}
+    constructor(
+        private readonly service: PlaylistEditorService,
+        private readonly gateway: PlaylistEditorGateway,
+    ) {}
 
     @ApiOperation({ summary: 'Create a playlist' })
     @Post()
@@ -21,14 +29,14 @@ export class PlaylistEditorController {
         return this.service.create(user.id, dto);
     }
 
-    @ApiOperation({ summary: 'List my playlists' })
+    @ApiOperation({ summary: 'List the playlists I own or co-edit' })
     @Get()
     findMine(@CurrentUser() user: { id: number }) {
         return this.service.findMine(user.id);
     }
 
     @ApiOperation({ summary: 'Get a playlist with its tracks' })
-    @ApiResponse({ status: 403, description: 'Playlist is private and you are not the owner' })
+    @ApiResponse({ status: 403, description: 'Playlist is private and you are neither owner nor editor' })
     @ApiResponse({ status: 404, description: 'Playlist not found' })
     @Get(':id')
     findOne(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number) {
@@ -37,8 +45,14 @@ export class PlaylistEditorController {
 
     @ApiOperation({ summary: 'Rename or change visibility of a playlist' })
     @Patch(':id')
-    update(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePlaylistDto) {
-        return this.service.update(id, user.id, dto);
+    async update(
+        @CurrentUser() user: { id: number },
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: UpdatePlaylistDto,
+    ) {
+        const playlist = await this.service.update(id, user.id, dto);
+        await this.gateway.broadcastState(id);
+        return playlist;
     }
 
     @ApiOperation({ summary: 'Delete a playlist' })
@@ -49,23 +63,64 @@ export class PlaylistEditorController {
 
     @ApiOperation({ summary: 'Add a Deezer track to a playlist' })
     @Post(':id/tracks')
-    addTrack(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number, @Body() dto: AddTrackDto) {
-        return this.service.addTrack(id, user.id, dto);
+    async addTrack(
+        @CurrentUser() user: { id: number },
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: AddTrackDto,
+    ) {
+        const track = await this.service.addTrack(id, user.id, dto);
+        await this.gateway.broadcastState(id);
+        return track;
     }
 
     @ApiOperation({ summary: 'Remove a track from a playlist' })
     @Delete(':id/tracks/:trackId')
-    removeTrack(
+    async removeTrack(
         @CurrentUser() user: { id: number },
         @Param('id', ParseIntPipe) id: number,
         @Param('trackId', ParseIntPipe) trackId: number,
     ) {
-        return this.service.removeTrack(id, trackId, user.id);
+        await this.service.removeTrack(id, trackId, user.id);
+        await this.gateway.broadcastState(id);
     }
 
     @ApiOperation({ summary: 'Reorder the tracks of a playlist' })
+    @ApiResponse({ status: 409, description: 'Playlist changed while you were reordering' })
     @Patch(':id/tracks/reorder')
-    reorder(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number, @Body() dto: ReorderTracksDto) {
-        return this.service.reorder(id, user.id, dto.trackIds);
+    async reorder(
+        @CurrentUser() user: { id: number },
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: ReorderTracksDto,
+    ) {
+        const state = await this.service.reorder(id, user.id, dto.trackIds, dto.version);
+        await this.gateway.broadcastState(id);
+        return state;
+    }
+
+    @ApiOperation({ summary: 'List the editors of a playlist' })
+    @Get(':id/collaborators')
+    listCollaborators(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number) {
+        return this.service.listCollaborators(id, user.id);
+    }
+
+    @ApiOperation({ summary: 'Grant edit rights on a playlist to another user' })
+    @ApiResponse({ status: 403, description: 'Only the owner can invite editors' })
+    @Post(':id/collaborators')
+    addCollaborator(
+        @CurrentUser() user: { id: number },
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: AddCollaboratorDto,
+    ) {
+        return this.service.addCollaborator(id, user.id, dto.userId);
+    }
+
+    @ApiOperation({ summary: 'Revoke edit rights' })
+    @Delete(':id/collaborators/:userId')
+    removeCollaborator(
+        @CurrentUser() user: { id: number },
+        @Param('id', ParseIntPipe) id: number,
+        @Param('userId', ParseIntPipe) userId: number,
+    ) {
+        return this.service.removeCollaborator(id, user.id, userId);
     }
 }

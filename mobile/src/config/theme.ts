@@ -1,5 +1,5 @@
-// Tokens de design partagés web + natif.
-// Toute couleur / rayon / ombre doit venir d'ici, pas d'une valeur en dur dans un écran.
+// tokens de design partages web + natif.
+// toute couleur / rayon / ombre doit venir d'ici, pas d'une valeur en dur dans un ecran.
 
 export const colors = {
     // fonds, du plus sombre au plus clair
@@ -8,7 +8,7 @@ export const colors = {
     surface: '#282828',
     surfaceHover: '#333333',
 
-    // bordures : très discrètes, elles servent à séparer sans alourdir
+    // bordures : tres discretes, elles servent a separer sans alourdir
     border: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.18)',
 
@@ -46,16 +46,16 @@ export const radius = {
     pill: 999,
 };
 
-// Largeurs max : sur mobile elles ne s'appliquent jamais (écran plus étroit),
-// sur le web elles évitent des lignes de texte / inputs étirés sur tout l'écran.
+// largeurs max : sur mobile elles ne s'appliquent jamais (ecran plus etroit),
+// sur le web elles evitent des lignes de texte / inputs etires sur tout l'ecran.
 export const layout = {
     maxWidth: 760,
     maxWidthNarrow: 420,
     wideBreakpoint: 700,
 };
 
-// boxShadow et pas shadowColor/shadowOpacity/... : les props "shadow*" sont dépréciées
-// (warning à chaque rendu sur web) et boxShadow marche sur les trois plateformes
+// boxShadow et pas shadowColor/shadowOpacity/... : les props "shadow*" sont depreciees
+// (warning a chaque rendu sur web) et boxShadow marche sur les trois plateformes
 // depuis la nouvelle archi, seule disponible en RN 0.85.
 export const shadows = {
     card: { boxShadow: '0 4px 10px rgba(0,0,0,0.25)' },

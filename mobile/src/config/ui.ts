@@ -1,14 +1,14 @@
 import { StyleSheet } from 'react-native';
 import { colors, radius, spacing, shadows } from './theme';
 
-// Styles réutilisables partagés par les écrans.
-// Usage : import { ui } from '../config/ui';
+// styles reutilisables partages par les ecrans.
+// usage : import { ui } from '../config/ui';
 //         <View style={ui.card}> ... <View style={[ui.row, { marginTop: spacing.md }]}>
 export const ui = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md },
 
-  // Les boutons/inputs sont maintenant des composants (Button, Field) : ces styles
+  // les boutons/inputs sont maintenant des composants (Button, Field) : ces styles
   // restent pour les cas ponctuels qui n'ont pas besoin d'un composant complet.
   card: {
     backgroundColor: colors.surface,

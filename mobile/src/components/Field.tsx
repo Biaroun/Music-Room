@@ -9,8 +9,8 @@ type FieldProps = TextInputProps & {
   containerStyle?: StyleProp<ViewStyle>;
 };
 
-// Champ texte unique de l'app : label optionnel, bordure qui réagit au focus
-// (indispensable sur web où il n'y a aucun retour visuel sinon) et état erreur.
+// champ texte unique de l'app : label optionnel, bordure qui reagit au focus
+// (indispensable sur web ou il n'y a aucun retour visuel sinon) et etat erreur.
 export default function Field({ label, hint, error, containerStyle, style, ...inputProps }: FieldProps) {
   const [focused, setFocused] = useState(false);
 

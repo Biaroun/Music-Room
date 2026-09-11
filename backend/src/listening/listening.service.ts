@@ -14,20 +14,19 @@ export type NowPlaying = {
     startedAt: number;
 };
 
-// Ce qu'on renvoie au client : l'écoute enrichie de qui écoute.
+// ce qu'on renvoie au client : l'ecoute enrichie de qui ecoute
 export type FriendListening = NowPlaying & {
     username: string;
     avatar: string | null;
 };
 
-// L'écoute en cours est un état transitoire : on la garde dans le cache Redis
-// (déjà branché via CacheModule) et pas en base.
-// Le TTL fait tout le travail de péremption : si le client cesse d'envoyer son
-// heartbeat (app fermée, réseau coupé, onglet tué), la clé disparaît d'elle-même
-// et l'utilisateur repasse en "aucune écoute". Aucun cron de nettoyage à maintenir.
+// l'ecoute en cours est un etat transitoire : stockee dans le cache redis, pas
+// en base. le ttl fait toute la peremption, si le client cesse son heartbeat la
+// cle disparait d'elle-meme et l'utilisateur repasse en aucune ecoute. pas de
+// cron de nettoyage a maintenir
 export const NOW_PLAYING_TTL_MS = 120_000;
-// Volontairement bien en dessous du TTL : un heartbeat perdu ne doit pas
-// faire disparaître l'écoute.
+// bien en dessous du ttl : un heartbeat perdu ne doit pas faire disparaitre
+// l'ecoute
 export const HEARTBEAT_INTERVAL_MS = 45_000;
 
 @Injectable()
@@ -49,7 +48,7 @@ export class ListeningService {
             title: dto.title,
             artist: dto.artist,
             cover: dto.cover ?? null,
-            // même morceau qu'avant = simple heartbeat, on ne remet pas le compteur à zéro
+            // meme morceau qu'avant : simple heartbeat, le compteur ne repart pas a zero
             startedAt: existing?.deezerId === dto.deezerId ? existing.startedAt : Date.now(),
         };
         await this.cache.set(this.key(userId), entry, NOW_PLAYING_TTL_MS);
@@ -73,8 +72,8 @@ export class ListeningService {
         return user.visibilitySettings?.listening ?? LISTENING_VISIBILITY_DEFAULT;
     }
 
-    // getFriends renvoie les relations avec les deux User chargés : on y lit d'un coup
-    // la liste des amis ET notre propre profil, sans dépendance vers UsersService.
+    // getFriends renvoie les relations avec les deux User charges : on y lit
+    // d'un coup la liste des amis et notre propre profil, sans UsersService
     private async socialGraph(userId: number): Promise<{ me: User | null; friends: User[] }> {
         const relations = await this.friendship.getFriends(userId);
         let me: User | null = null;
@@ -87,8 +86,8 @@ export class ListeningService {
     }
 
     /**
-     * Qui doit recevoir MON écoute, et mon propre profil pour composer le message.
-     * friendIds est vide si je me suis mis en privé.
+     * qui doit recevoir mon ecoute, et mon profil pour composer le message.
+     * friendIds est vide si je me suis mis en prive.
      */
     async getAudience(userId: number): Promise<{ me: User | null; friendIds: number[] }> {
         const { me, friends } = await this.socialGraph(userId);
@@ -97,7 +96,7 @@ export class ListeningService {
         return { me, friendIds: friends.map((f) => f.id) };
     }
 
-    /** Écoutes en cours des amis qui acceptent de me les montrer. */
+    /** ecoutes en cours des amis qui acceptent de me les montrer */
     async getFriendsListening(userId: number): Promise<FriendListening[]> {
         const { friends } = await this.socialGraph(userId);
         const visible = friends.filter((f) => this.listeningVisibility(f) !== Visibility.PRIVATE);

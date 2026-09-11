@@ -3,11 +3,10 @@ import { User } from '../users/user.entity';
 import { Event } from './event.entity';
 import { PlaylistTrack } from '../playlist-editor/playlist-track.entity';
 
-// Un voter peut voter pour plusieurs morceaux differents d'un meme event, mais
-// une seule fois chacun : la contrainte unique porte sur (event, voter, track),
-// pas seulement (event, voter). C'est elle qui rend le vote atomique
-// (INSERT ... ON CONFLICT DO NOTHING), jamais un compteur lu-puis-ecrit qui
-// pourrait perdre une mise a jour concurrente.
+// un voter peut voter pour plusieurs morceaux d'un event mais une seule fois
+// chacun, d'ou la contrainte unique sur (event, voter, track) et pas seulement
+// (event, voter). c'est elle qui rend le vote atomique via
+// insert ... on conflict do nothing, plutot qu'un compteur lu puis ecrit
 @Entity()
 @Unique(['event', 'voter', 'track'])
 export class Vote {

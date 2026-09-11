@@ -15,7 +15,7 @@ export class UsersController {
                 private friendshipService: FriendshipService) {}
 
 
-    // doit rester declaree AVANT @Get(':id'), sinon /users/search tombe dans :id
+    // a garder declaree avant @Get(':id'), sinon /users/search tombe dans :id
     @ApiOperation({ summary: 'Search or list users by username' })
     @ApiResponse({ status: 200, description: 'Users matching the query (all users if q is empty)' })
     @UseGuards(JwtAuthGuard)
@@ -47,6 +47,10 @@ export class UsersController {
             oAuthProvider: fulluser.oAuthProvider,
             plan: fulluser.plan,
             subscribedAt: fulluser.subscribedAt,
+            // null si aucun compte google n'est lie
+            googleEmail: fulluser.googleEmail ?? null,
+            // un compte google sans mot de passe ne peut pas delier google
+            hasPassword: !!fulluser.password,
             createdAt: fulluser.createdAt,
             updatedAt: fulluser.updatedAt,
         };

@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsLatitude, IsLongitude, IsOptional } from 'class-validator';
 
-// Recu en query string (?latitude=...&longitude=...) : @Type coerce la chaine
+// recu en query string : @Type coerce la chaine
 // en nombre, sans quoi class-validator rejette une valeur qui arrive en string.
 export class RetractVoteDto {
     @ApiProperty({ required: false })

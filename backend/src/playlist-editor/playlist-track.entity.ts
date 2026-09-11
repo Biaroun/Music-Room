@@ -6,7 +6,7 @@ export class PlaylistTrack {
     @PrimaryGeneratedColumn()
     id: number;
 
-    // l'id du morceau chez Deezer, pas l'id de cette ligne
+    // id du morceau chez deezer, pas id de cette ligne
     @Column()
     deezerId: string;
 
@@ -25,11 +25,11 @@ export class PlaylistTrack {
     @Column()
     previewUrl: string;
 
-    // deezer renvoie le bpm en float (ex: 118.6)
+    // deezer renvoie le bpm en float
     @Column({ type: 'float', nullable: true })
     bpm: number | null;
 
-    // ordre d'affichage dans la playlist, 0-based
+    // ordre d'affichage, 0-based
     @Column({ type: 'int' })
     position: number;
 
@@ -39,9 +39,8 @@ export class PlaylistTrack {
     @CreateDateColumn()
     addedAt: Date;
 
-    // Usage track-vote uniquement : marque un morceau comme deja joue dans la
-    // file d'attente d'un event, pour qu'il sorte du classement votable et ne
-    // repasse jamais. Reste null pour l'usage playlist-editor classique.
+    // track-vote uniquement : marque un morceau deja joue pour qu'il sorte du
+    // classement votable. null cote playlist-editor
     @Column({ type: 'timestamp', nullable: true })
     playedAt: Date | null;
 }

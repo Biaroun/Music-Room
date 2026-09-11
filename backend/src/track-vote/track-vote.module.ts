@@ -13,10 +13,12 @@ import { Vote } from './vote.entity';
 import { Playlist } from '../playlist-editor/playlist.entity';
 import { PlaylistTrack } from '../playlist-editor/playlist-track.entity';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { User } from '../users/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Event, EventInvite, Vote, Playlist, PlaylistTrack]),
+    // User : JwtAuthGuard en a besoin pour le controle emailisVerified
+    TypeOrmModule.forFeature([Event, EventInvite, Vote, Playlist, PlaylistTrack, User]),
     SubscriptionModule,
     // AuthModule n'exporte pas JwtModule : on le reenregistre avec le meme
     // secret pour que le gateway puisse verifier le token de la poignee de main

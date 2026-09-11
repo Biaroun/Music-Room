@@ -11,10 +11,9 @@ import { SubscriptionService } from '../subscription/subscription.service';
 
 export type VoterPosition = { latitude: number; longitude: number };
 
-// Ce que le front a besoin de savoir pour afficher correctement un event sans
-// deviner : suis-je le createur, suis-je invite, et puis-je voter maintenant
-// (independamment de la position, verifiee seulement au moment du vote pour
-// les events geo-restreints).
+// ce que le front doit savoir pour afficher un event sans deviner : suis-je
+// createur, suis-je invite, puis-je voter maintenant. la position n'entre pas
+// en compte ici, elle est verifiee au moment du vote
 export type EventForUser = Event & {
     isOwner: boolean;
     isInvited: boolean;
@@ -61,7 +60,7 @@ export class EventService {
         return this.events.save(event);
     }
 
-    /** Evenements publics + les miens + ceux ou je suis invite, avec mon statut sur chacun. */
+    /** events publics, les miens et ceux ou je suis invite, avec mon statut */
     async findVisible(userId: number): Promise<EventForUser[]> {
         const invited = await this.invites.find({
             where: { invitee: { id: userId } },
@@ -87,7 +86,7 @@ export class EventService {
         });
     }
 
-    /** Un seul event, enrichi du meme statut que findVisible. 404 si non visible. */
+    /** un seul event, meme statut que findVisible. 404 si non visible */
     async findOneForUser(id: number, userId: number): Promise<EventForUser> {
         const event = await this.assertCanView(id, userId);
         const isOwner = event.owner.id === userId;
@@ -96,9 +95,8 @@ export class EventService {
     }
 
     /**
-     * Peut voter "en l'etat" sans tenir compte de la position (verifiee
-     * seulement au moment reel du vote pour les events geo-restreints) :
-     * sert a afficher un badge, pas a autoriser une action.
+     * peut voter en l'etat, sans tenir compte de la position qui n'est
+     * verifiee qu'au vote reel. sert a afficher un badge, pas a autoriser.
      */
     private computeCanVote(event: Event, isOwner: boolean, isInvited: boolean): boolean {
         if (event.licenseMode === EventLicenseMode.OPEN) return true;
@@ -177,9 +175,9 @@ export class EventService {
     }
 
     /**
-     * Peut-on meme voir/trouver cet event ? Public -> tout le monde. Prive ->
-     * proprietaire ou invite, sinon 404 (pas 403) pour ne pas laisser deviner
-     * qu'un event prive existe.
+     * peut-on seulement voir cet event ? public : tout le monde. prive :
+     * proprietaire ou invite, sinon 404 et pas 403, pour ne pas laisser
+     * deviner qu'un event prive existe.
      */
     async assertCanView(eventId: number, userId: number): Promise<Event> {
         const event = await this.findOne(eventId);
@@ -188,10 +186,7 @@ export class EventService {
         throw new NotFoundException('Event not found');
     }
 
-    /**
-     * Etant donne qu'on peut voir l'event, peut-on y voter maintenant ? Ne
-     * jamais appeler sans assertCanView prealable.
-     */
+    /** l'event etant visible, peut-on y voter maintenant ? suppose assertCanView fait */
     async assertCanVote(eventId: number, userId: number, position?: VoterPosition): Promise<Event> {
         const event = await this.assertCanView(eventId, userId);
 
@@ -202,7 +197,7 @@ export class EventService {
             throw new ForbiddenException('You are not invited to vote in this event');
         }
 
-        // GEO_TIME_RESTRICTED
+        // reste GEO_TIME_RESTRICTED
         const now = new Date();
         if (event.licenseStartsAt && now < event.licenseStartsAt) {
             throw new ForbiddenException('Voting has not started yet for this event');

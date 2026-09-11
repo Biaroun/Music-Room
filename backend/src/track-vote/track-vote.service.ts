@@ -9,8 +9,8 @@ import { Playlist } from '../playlist-editor/playlist.entity';
 import { EventService } from './event.service';
 import { AddTrackDto } from '../playlist-editor/dto/add-track.dto';
 
-// Duree standard d'un extrait Deezer : sert de duree de lecture pour la file
-// d'attente, faute de duree exacte stockee par morceau.
+// duree standard d'un extrait deezer, faute de duree exacte stockee par
+// morceau : sert de duree de lecture pour la file
 export const PREVIEW_DURATION_MS = 30_000;
 
 export type BoardTrack = {
@@ -52,8 +52,8 @@ export class TrackVoteService {
         @Inject(CACHE_MANAGER) private cache: Cache,
     ) {}
 
-    // La verification d'acces (visibilite/licence) reste dans EventService, ici
-    // on suppose qu'elle a deja ete faite par l'appelant (controller/gateway).
+    // le controle d'acces reste dans EventService : ici on suppose l'appelant
+    // l'a deja fait
 
     async suggestTrack(eventId: number, dto: AddTrackDto): Promise<PlaylistTrack> {
         const event = await this.eventService.findOne(eventId);
@@ -63,10 +63,9 @@ export class TrackVoteService {
     }
 
     /**
-     * Copie tous les morceaux d'une de mes playlists dans la playlist de
-     * l'event, en une seule ecriture (un seul broadcast declenche par
-     * l'appelant apres, pas un par morceau). Les morceaux deja presents dans
-     * l'event (meme deezerId) ne sont pas dupliques.
+     * copie une de mes playlists dans celle de l'event en une seule ecriture,
+     * donc un seul broadcast a la fin plutot qu'un par morceau. les deezerId
+     * deja presents ne sont pas dupliques.
      */
     async importPlaylist(eventId: number, requesterId: number, sourcePlaylistId: number): Promise<{ added: number }> {
         const event = await this.eventService.findOne(eventId);
@@ -103,19 +102,17 @@ export class TrackVoteService {
     }
 
     /**
-     * Un voter peut voter pour plusieurs morceaux, mais une seule fois chacun :
-     * contrainte unique (event, voter, track) en base. INSERT ... ON CONFLICT
-     * DO NOTHING est une seule instruction SQL atomique, donc deux votes
-     * concurrents du meme utilisateur pour le meme morceau ne peuvent ni
-     * dupliquer de ligne ni se marcher dessus.
+     * un voter vote pour plusieurs morceaux mais une seule fois chacun, via la
+     * contrainte unique (event, voter, track). insert ... on conflict do
+     * nothing tient en une instruction atomique, donc deux votes concurrents
+     * ne peuvent ni dupliquer de ligne ni se marcher dessus.
      */
     async castVote(eventId: number, voterId: number, trackId: number): Promise<void> {
         const belongs = await this.trackBelongsToEvent(eventId, trackId);
         if (!belongs) throw new NotFoundException('Track not found in this event');
 
-        // Les proprietes de relation s'appellent event/voter/track (pas
-        // eventId/voterId/trackId) : la query builder insert() les mappe vers
-        // les FK reelles seulement si on passe l'id sous le nom de la relation.
+        // les relations s'appellent event/voter/track et pas eventId/voterId :
+        // insert() ne mappe vers les vraies cles que sous ce nom-la
         await this.votes
             .createQueryBuilder()
             .insert()
@@ -129,7 +126,7 @@ export class TrackVoteService {
         await this.votes.delete({ event: { id: eventId }, voter: { id: voterId }, track: { id: trackId } });
     }
 
-    /** Board pour un utilisateur precis (inclut ses propres votes, un par morceau). */
+    /** board d'un utilisateur precis, avec ses propres votes */
     async getBoard(eventId: number, userId: number): Promise<Board> {
         const board = await this.getPublicBoard(eventId);
         const myVotes = await this.votes.find({
@@ -143,7 +140,7 @@ export class TrackVoteService {
         };
     }
 
-    /** Board diffuse a toute la room (pas de notion de "mon vote" cote broadcast). */
+    /** board diffuse a la room, sans notion de vote personnel */
     async getPublicBoard(eventId: number): Promise<Board> {
         await this.ensureAdvanced(eventId);
 
@@ -173,12 +170,10 @@ export class TrackVoteService {
     }
 
     /**
-     * Fait avancer la file si le morceau en cours a depasse sa duree.
-     * Le passage "joue" est un UPDATE conditionnel atomique (playedAt IS NULL
-     * -> playedAt = now) : si deux appels concurrents (deux clients qui
-     * rafraichissent en meme temps) tombent ici ensemble, un seul "gagne" la
-     * ligne et choisit le morceau suivant, l'autre voit affected=0 et
-     * s'arrete sans dupliquer l'avancee ni relancer un choix different.
+     * fait avancer la file si le morceau en cours a depasse sa duree.
+     * le passage a joue est un update conditionnel atomique sur playedAt : si
+     * deux clients rafraichissent en meme temps, un seul gagne la ligne et
+     * choisit le suivant, l'autre voit affected=0 et s'arrete.
      */
     private async ensureAdvanced(eventId: number): Promise<void> {
         const state = await this.getNowPlayingState(eventId);

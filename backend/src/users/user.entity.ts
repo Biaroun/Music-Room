@@ -44,15 +44,22 @@ export interface VisibilitySettings {
   username: Visibility;
   bio: Visibility;
   musicPreferences: Visibility;
-  // Écoute en cours. Optionnel : les comptes créés avant l'ajout du champ n'ont
-  // pas la clé, on retombe alors sur FRIENDS_ONLY (cf. LISTENING_VISIBILITY_DEFAULT).
-  // Colonne simple-json, donc aucune migration nécessaire.
+  // ecoute en cours, optionnel : les comptes crees avant l'ajout du champ
+  // n'ont pas la cle et retombent sur LISTENING_VISIBILITY_DEFAULT.
+  // colonne simple-json, donc pas de migration
   listening?: Visibility;
 }
 
-// Seuls les amis interrogent déjà l'écoute en cours : le choix qui compte
-// vraiment ici est PRIVATE, pour se rendre invisible même de ses amis.
+// seuls les amis interrogent deja l'ecoute en cours : le choix qui compte ici
+// est PRIVATE, pour se rendre invisible meme d'eux
 export const LISTENING_VISIBILITY_DEFAULT = Visibility.FRIENDS_ONLY;
+
+// ce qu'on garde d'un compte google, qu'il vienne du flux web ou d'un id token
+export interface GoogleIdentity {
+  googleId: string;
+  email: string;
+  username: string;
+}
 
 @Entity()
 export class User {
@@ -76,6 +83,14 @@ export class User {
 
   @Column({ type: 'enum', enum: OAuthProvider, default: OAuthProvider.LOCAL })
   oAuthProvider: OAuthProvider;
+
+  // claim sub de google : stable, contrairement a l'email qui peut changer.
+  // c'est lui qui retrouve un compte lie, l'email n'est affiche que pour l'ui
+  @Column({ type: 'varchar', unique: true, nullable: true, select: false })
+  googleId: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  googleEmail: string | null;
 
   @Column({ nullable: true })
   bio: string;

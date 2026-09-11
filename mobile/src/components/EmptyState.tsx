@@ -12,7 +12,7 @@ type EmptyStateProps = {
   onAction?: () => void;
 };
 
-// Bloc "rien à afficher" partagé — remplace les lignes de texte grises isolées.
+// bloc "rien a afficher" partage , remplace les lignes de texte grises isolees.
 export default function EmptyState({ icon, title, message, actionLabel, onAction }: EmptyStateProps) {
   return (
     <View style={styles.container}>

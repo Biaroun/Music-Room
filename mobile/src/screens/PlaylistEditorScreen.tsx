@@ -1,6 +1,5 @@
-// mobile/src/screens/PlaylistEditorScreen.tsx
-// Charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
-import React, { useEffect, useState } from 'react';
+// charge/persiste via le backend playlist-editor (voir mobile/src/lib/playlists.ts).
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -12,18 +11,28 @@ import { getTrackBpm } from '../lib/deezer';
 import type { DeezerTrack } from '../lib/deezerTypes';
 import { usePreviewPlayer, type PreviewTrack } from '../context/PreviewPlayerContext';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 import { useToast } from '../components/Toast';
 import TrackSearch from '../components/TrackSearch';
+import { apiFetch } from '../config/api';
 import {
   type ApiPlaylistTrack,
+  type PlaylistCollaborator,
+  type PlaylistLicenseMode,
   getPlaylist,
   updatePlaylist,
   addTrackToPlaylist,
   removeTrackFromPlaylist,
   reorderPlaylistTracks,
+  listCollaborators,
+  addCollaborator,
+  removeCollaborator,
 } from '../lib/playlists';
 
 type Track = ApiPlaylistTrack;
+
+// utilise seulement quand le websocket ne passe pas, meme cadence que RealtimeContext.
+const FALLBACK_POLL_MS = 20_000;
 
 function toPreviewTrack(tk: Track): PreviewTrack {
   return {
@@ -43,28 +52,72 @@ export default function PlaylistEditorScreen({ route }: any) {
   const { showToast } = useToast();
   const { activeTrack, isPlaying, toggle } = usePreviewPlayer();
   const bottomInset = useBottomInset();
+  const {
+    connected, playlistState, joinPlaylist, leavePlaylist,
+    addTrackRealtime, removeTrackRealtime, reorderRealtime,
+  } = useRealtime();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
+  const [licenseMode, setLicenseMode] = useState<PlaylistLicenseMode>('open');
   const [tracks, setTracks] = useState<Track[]>([]);
+  // version du dernier etat vu : renvoyee a chaque reorder pour que le serveur
+  // refuse le notre si quelqu'un a reordonne entre-temps
+  const [version, setVersion] = useState(0);
+  const [isOwner, setIsOwner] = useState(true);
+  const [collaborators, setCollaborators] = useState<PlaylistCollaborator[]>([]);
+  const [friends, setFriends] = useState<{ friendId: number; username: string }[]>([]);
 
   useEffect(() => {
-    let active = true;
-    getPlaylist(playlistId, token)
-      .then((playlist) => {
-        if (!active) return;
+    joinPlaylist(playlistId);
+    return () => leavePlaylist(playlistId);
+  }, [playlistId, joinPlaylist, leavePlaylist]);
+
+  // le socket est la source temps reel ; ce chargement rest couvre le premier
+  // affichage et le cas ou le websocket ne passe pas. C'est aussi lui qui donne
+  // isOwner, AuthContext n'exposant pas l'utilisateur courant.
+  const loadFromRest = useCallback(() => {
+    return getPlaylist(playlistId, token)
+      .then(async (playlist) => {
         setName(playlist.name);
         setIsPublic(playlist.isPublic);
+        setLicenseMode(playlist.licenseMode);
         setTracks(playlist.tracks ?? []);
+        setVersion(playlist.version);
+        setIsOwner(playlist.isOwner ?? true);
+        setCollaborators(await listCollaborators(playlistId, token).catch(() => []));
       })
-      .catch(() => {
-        if (active) showToast({ type: 'error', message: 'Failed to load playlist' });
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [playlistId]);
+      .catch(() => showToast({ type: 'error', message: 'Failed to load playlist' }));
+  }, [playlistId, token]);
+
+  useEffect(() => {
+    loadFromRest().finally(() => setLoading(false));
+  }, [loadFromRest]);
+
+  // repli : tant que le websocket ne passe pas, on interroge le REST.
+  useEffect(() => {
+    if (connected) return;
+    const id = setInterval(loadFromRest, FALLBACK_POLL_MS);
+    return () => clearInterval(id);
+  }, [connected, loadFromRest]);
+
+  // un etat pousse par le serveur fait toujours autorite sur l'etat local.
+  useEffect(() => {
+    if (!playlistState || playlistState.id !== playlistId) return;
+    setName(playlistState.name);
+    setIsPublic(playlistState.isPublic);
+    setLicenseMode(playlistState.licenseMode);
+    setTracks(playlistState.tracks);
+    setVersion(playlistState.version);
+    setCollaborators(playlistState.collaborators);
+  }, [playlistState, playlistId]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    apiFetch('/friendship/friends', token)
+      .then(setFriends)
+      .catch(() => {});
+  }, [isOwner, token]);
 
   function saveName() {
     if (!name.trim()) return;
@@ -82,20 +135,36 @@ export default function PlaylistEditorScreen({ route }: any) {
     });
   }
 
-  // Deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche —
+  // axe distinct de la visibilite : qui a le droit d'editer, pas qui peut lire.
+  function toggleLicense() {
+    const next: PlaylistLicenseMode = licenseMode === 'open' ? 'invite-only' : 'open';
+    setLicenseMode(next);
+    updatePlaylist(playlistId, token, { licenseMode: next }).catch(() => {
+      setLicenseMode(licenseMode);
+      showToast({ type: 'error', message: 'Failed to update editing rights' });
+    });
+  }
+
+  // deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche ,
   // on le recupere avant l'ajout, comme ca le backend a directement la bonne valeur.
   async function pickTrack(dt: DeezerTrack) {
     const bpm = dt.bpm ?? (await getTrackBpm(dt.id).catch(() => null));
+    const dto = {
+      deezerId: dt.id,
+      title: dt.title,
+      artist: dt.artist,
+      artistId: dt.artistId || undefined,
+      cover: dt.cover ?? undefined,
+      previewUrl: dt.previewUrl!,
+      bpm: bpm ?? undefined,
+    };
+    if (connected) {
+      // l'etat revient par playlist:state, inutile de toucher tracks ici
+      addTrackRealtime(playlistId, dto);
+      return;
+    }
     try {
-      const track = await addTrackToPlaylist(playlistId, token, {
-        deezerId: dt.id,
-        title: dt.title,
-        artist: dt.artist,
-        artistId: dt.artistId || undefined,
-        cover: dt.cover ?? undefined,
-        previewUrl: dt.previewUrl!,
-        bpm: bpm ?? undefined,
-      });
+      const track = await addTrackToPlaylist(playlistId, token, dto);
       setTracks((t) => [...t, track]);
     } catch {
       showToast({ type: 'error', message: 'Failed to add track' });
@@ -103,6 +172,10 @@ export default function PlaylistEditorScreen({ route }: any) {
   }
 
   async function removeTrack(trackId: number) {
+    if (connected) {
+      removeTrackRealtime(playlistId, trackId);
+      return;
+    }
     try {
       await removeTrackFromPlaylist(playlistId, trackId, token);
       setTracks((t) => t.filter((x) => x.id !== trackId));
@@ -112,16 +185,36 @@ export default function PlaylistEditorScreen({ route }: any) {
   }
 
   function move(index: number, dir: -1 | 1) {
-    setTracks((t) => {
-      const j = index + dir;
-      if (j < 0 || j >= t.length) return t;
-      const copy = [...t];
-      [copy[index], copy[j]] = [copy[j], copy[index]];
-      reorderPlaylistTracks(playlistId, token, copy.map((tk) => tk.id)).catch(() =>
-        showToast({ type: 'error', message: 'Failed to save order' })
-      );
-      return copy;
-    });
+    const j = index + dir;
+    if (j < 0 || j >= tracks.length) return;
+    const copy = [...tracks];
+    [copy[index], copy[j]] = [copy[j], copy[index]];
+    // optimiste : le broadcast (ou playlist:conflict) reconcilie juste apres
+    setTracks(copy);
+
+    const ids = copy.map((tk) => tk.id);
+    if (connected) {
+      reorderRealtime(playlistId, ids, version);
+      return;
+    }
+    // repli rest : apiFetch ne remonte pas le statut http, on ne peut pas
+    // distinguer un 409 d'une autre erreur , on recharge l'ordre du serveur.
+    reorderPlaylistTracks(playlistId, token, ids, version)
+      .then((state) => setVersion(state.version))
+      .catch(() => {
+        showToast({ type: 'error', message: 'Failed to save order' });
+        loadFromRest();
+      });
+  }
+
+  async function toggleCollaborator(friendId: number, isCollaborator: boolean) {
+    try {
+      if (isCollaborator) await removeCollaborator(playlistId, token, friendId);
+      else await addCollaborator(playlistId, token, friendId);
+      setCollaborators(await listCollaborators(playlistId, token));
+    } catch {
+      showToast({ type: 'error', message: 'Failed to update editors' });
+    }
   }
 
   function playAll() {
@@ -159,30 +252,72 @@ export default function PlaylistEditorScreen({ route }: any) {
             <Ionicons name="musical-note" size={64} color={colors.textPrimary} />
           </LinearGradient>
 
-          <TextInput
-            style={styles.titleInput}
-            value={name}
-            onChangeText={setName}
-            onBlur={saveName}
-            placeholder="Playlist name"
-            placeholderTextColor={colors.textSecondary}
-            selectTextOnFocus
-          />
+          {isOwner ? (
+            <TextInput
+              style={styles.titleInput}
+              value={name}
+              onChangeText={setName}
+              onBlur={saveName}
+              placeholder="Playlist name"
+              placeholderTextColor={colors.textSecondary}
+              selectTextOnFocus
+            />
+          ) : (
+            <Text style={styles.titleInput} numberOfLines={2}>{name}</Text>
+          )}
 
           <View style={styles.metaRow}>
-            <Text style={styles.meta}>You</Text>
+            <Text style={styles.meta}>{isOwner ? 'You' : playlistState?.owner.username ?? 'Shared with you'}</Text>
             <Text style={styles.dot}>•</Text>
-            <PressableCard
-              onPress={toggleVisibility}
-              style={styles.visToggle}
-              hoverStyle={styles.visToggleHover}
-              accessibilityLabel="Toggle playlist visibility"
-            >
-              <Ionicons name={isPublic ? 'earth' : 'lock-closed'} size={12} color={colors.textSecondary} />
-              <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
-            </PressableCard>
+            {isOwner ? (
+              <PressableCard
+                onPress={toggleVisibility}
+                style={styles.visToggle}
+                hoverStyle={styles.visToggleHover}
+                accessibilityLabel="Toggle playlist visibility"
+              >
+                <Ionicons name={isPublic ? 'earth' : 'lock-closed'} size={12} color={colors.textSecondary} />
+                <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
+              </PressableCard>
+            ) : (
+              <View style={styles.visToggle}>
+                <Ionicons name={isPublic ? 'earth' : 'lock-closed'} size={12} color={colors.textSecondary} />
+                <Text style={styles.meta}>{isPublic ? 'Public' : 'Private'}</Text>
+              </View>
+            )}
+            <Text style={styles.dot}>•</Text>
+            {isOwner ? (
+              <PressableCard
+                onPress={toggleLicense}
+                style={styles.visToggle}
+                hoverStyle={styles.visToggleHover}
+                accessibilityLabel="Toggle who can edit this playlist"
+              >
+                <Ionicons
+                  name={licenseMode === 'open' ? 'people' : 'person'}
+                  size={12}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.meta}>{licenseMode === 'open' ? 'Anyone edits' : 'Invited edit'}</Text>
+              </PressableCard>
+            ) : (
+              <View style={styles.visToggle}>
+                <Ionicons
+                  name={licenseMode === 'open' ? 'people' : 'person'}
+                  size={12}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.meta}>{licenseMode === 'open' ? 'Anyone edits' : 'Invited edit'}</Text>
+              </View>
+            )}
             <Text style={styles.dot}>•</Text>
             <Text style={styles.meta}>{tracks.length} {tracks.length === 1 ? 'song' : 'songs'}</Text>
+            {!connected && (
+              <>
+                <Text style={styles.dot}>•</Text>
+                <Text style={styles.meta}>Offline</Text>
+              </>
+            )}
           </View>
 
           <PressableCard
@@ -247,6 +382,48 @@ export default function PlaylistEditorScreen({ route }: any) {
         {/* Add a track */}
         <Text style={styles.addTitle}>Add a track</Text>
         <TrackSearch onSelect={pickTrack} />
+
+        {/* Editors : seul le proprietaire donne ou retire le droit d'edition */}
+        <Text style={styles.addTitle}>Editors</Text>
+        {licenseMode === 'open' && (
+          <Text style={styles.trackArtist}>
+            This playlist is open — anyone who can see it can edit it. Switch to “Invited edit” to
+            restrict it to the people below.
+          </Text>
+        )}
+        {isOwner ? (
+          friends.length === 0 ? (
+            <Text style={styles.trackArtist}>Add friends to invite them as editors.</Text>
+          ) : (
+            friends.map((f) => {
+              const isCollaborator = collaborators.some((c) => c.id === f.friendId);
+              return (
+                <PressableCard
+                  key={f.friendId}
+                  style={styles.row}
+                  hoverStyle={styles.rowHover}
+                  onPress={() => toggleCollaborator(f.friendId, isCollaborator)}
+                  accessibilityLabel={isCollaborator ? `Remove ${f.username} as editor` : `Add ${f.username} as editor`}
+                >
+                  <View style={styles.trackInfo}>
+                    <Text style={styles.trackTitle}>{f.username}</Text>
+                  </View>
+                  <Ionicons
+                    name={isCollaborator ? 'checkmark-circle' : 'add-circle-outline'}
+                    size={20}
+                    color={isCollaborator ? colors.accent : colors.textSecondary}
+                  />
+                </PressableCard>
+              );
+            })
+          )
+        ) : (
+          <Text style={styles.trackArtist}>
+            {collaborators.length > 0
+              ? collaborators.map((c) => c.username).join(', ')
+              : 'No other editors.'}
+          </Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -269,7 +446,8 @@ const styles = StyleSheet.create({
     fontSize: 32, fontWeight: '800', color: colors.textPrimary, letterSpacing: -0.8,
     padding: 0, outlineWidth: 0,
   },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
+  // wrap : la ligne porte jusqu'a 5 chips (auteur, visibilite, licence, compte, offline)
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', rowGap: spacing.xs, marginTop: spacing.sm },
   meta: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
   dot: { color: colors.textSecondary, fontSize: 13, marginHorizontal: spacing.xs },
   visToggle: {
@@ -287,7 +465,7 @@ const styles = StyleSheet.create({
   playFabHover: { backgroundColor: colors.accentHover },
   playFabOff: { opacity: 0.45 },
 
-  // paddingTop laisse passer la moitié du bouton play qui déborde de l'en-tête
+  // paddingTop laisse passer la moitie du bouton play qui deborde de l'en-tete
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.xl + spacing.xs },
   row: {
     flexDirection: 'row', alignItems: 'center',

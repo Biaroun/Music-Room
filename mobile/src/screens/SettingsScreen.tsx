@@ -11,6 +11,7 @@ import Field from '../components/Field';
 import Button from '../components/Button';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { subscribe, cancelSubscription, type SubscriptionPlan } from '../lib/subscription';
+import GoogleLinkCard from '../components/GoogleLinkCard';
 
 type Me = {
   id: number;
@@ -19,12 +20,14 @@ type Me = {
   emailisVerified: boolean;
   plan: SubscriptionPlan;
   subscribedAt: string | null;
+  googleEmail: string | null;
+  hasPassword: boolean;
 };
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/;
 
 export default function SettingsScreen({ navigation }: any) {
-  const { token, logout } = useAuth();
+  const { token, logout, refreshAccount } = useAuth();
   const { showToast } = useToast();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +58,9 @@ export default function SettingsScreen({ navigation }: any) {
         body: JSON.stringify({ newemail, currentpassword: emailPwd }),
       });
       showToast({ type: 'success', message: 'Email updated — check your inbox to verify it.' });
-      setNewemail(''); setEmailPwd(''); loadMe();
+      setNewemail(''); setEmailPwd('');
+      // la nouvelle adresse n'est pas verifiee : l'app bascule sur l'ecran de validation
+      await refreshAccount();
     } catch (e: any) { showToast({ type: 'error', message: e.message }); }
     finally { setSavingEmail(false); }
   }
@@ -93,7 +98,7 @@ export default function SettingsScreen({ navigation }: any) {
     }
   }
 
-  // Validation affichée pendant la saisie plutôt qu'en pop-up après coup.
+  // validation affichee pendant la saisie plutot qu'en pop-up apres coup.
   const weakPwd = newPwd.length > 0 && !PASSWORD_RULE.test(newPwd);
   const mismatch = newPwdConfirm.length > 0 && newPwd !== newPwdConfirm;
   const pwdFormValid = !!curPwd && PASSWORD_RULE.test(newPwd) && newPwd === newPwdConfirm;
@@ -129,6 +134,9 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </View>
       </View>
+
+      <Text style={[typography.h2, ui.section]}>Linked accounts</Text>
+      <GoogleLinkCard googleEmail={me?.googleEmail ?? null} hasPassword={!!me?.hasPassword} onChange={loadMe} />
 
       <Text style={[typography.h2, ui.section]}>Change email</Text>
       <View style={ui.card}>

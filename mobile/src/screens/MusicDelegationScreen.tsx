@@ -2,7 +2,7 @@ import React from 'react';
 import Screen from '../components/Screen';
 import EmptyState from '../components/EmptyState';
 
-// écran en attente de l'API back (delegation pas encore faite)
+// ecran en attente de l'api back (delegation pas encore faite)
 export default function MusicDelegationScreen() {
   return (
     <Screen scroll={false} center>

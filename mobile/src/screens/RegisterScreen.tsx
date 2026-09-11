@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import Screen from '../components/Screen';
 import Field from '../components/Field';
 import Button from '../components/Button';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 export default function RegisterScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
@@ -15,7 +16,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
-  // Retour immédiat sur la confirmation : plus lisible qu'une erreur après l'envoi.
+  // retour immediat sur la confirmation : plus lisible qu'une erreur apres l'envoi.
   const mismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const canSubmit = !!username && !!email && !!password && !!passwordConfirm && !mismatch;
 
@@ -27,7 +28,7 @@ export default function RegisterScreen({ navigation }: any) {
         method: 'POST',
         body: JSON.stringify({ username, email, password, passwordConfirm }),
       });
-      showToast({ type: 'success', message: 'Account created! Please log in.' });
+      showToast({ type: 'success', message: 'Account created! A verification link was sent to your inbox.' });
       navigation.navigate('Login', { email });
     } catch (e: any) {
       showToast({ type: 'error', message: e.message });
@@ -71,6 +72,8 @@ export default function RegisterScreen({ navigation }: any) {
       />
 
       <Button title="Register" onPress={handleRegister} loading={loading} disabled={!canSubmit} style={{ marginTop: spacing.md }} />
+
+      <GoogleSignInButton label="Sign up with Google" />
 
       <View style={styles.footer}>
         <Text style={typography.caption}>Already have an account? </Text>

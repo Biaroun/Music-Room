@@ -13,14 +13,40 @@ export type ApiPlaylistTrack = {
   addedAt: string;
 };
 
+/** qui peut editer, independamment de isPublic qui ne regle que la lecture. */
+export type PlaylistLicenseMode = 'open' | 'invite-only';
+
 export type ApiPlaylist = {
   id: number;
   name: string;
   isPublic: boolean;
+  licenseMode: PlaylistLicenseMode;
+  version: number;
   owner: { id: number; username: string };
   tracks?: ApiPlaylistTrack[];
+  /** false quand la playlist m'est partagee : le mobile masque les actions owner-only */
+  isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PlaylistCollaborator = {
+  id: number;
+  username: string;
+  avatar: string | null;
+};
+
+/** etat complet pousse par la gateway sur playlist:state. */
+export type PlaylistState = {
+  id: number;
+  name: string;
+  isPublic: boolean;
+  licenseMode: PlaylistLicenseMode;
+  version: number;
+  owner: { id: number; username: string };
+  collaborators: PlaylistCollaborator[];
+  tracks: ApiPlaylistTrack[];
+  updatedAt: number;
 };
 
 export type AddTrackInput = {
@@ -45,7 +71,11 @@ export function createPlaylist(token: string | null, body: { name: string; isPub
   return apiFetch('/playlist-editor', token, { method: 'POST', body: JSON.stringify(body) });
 }
 
-export function updatePlaylist(id: number, token: string | null, patch: { name?: string; isPublic?: boolean }): Promise<ApiPlaylist> {
+export function updatePlaylist(
+  id: number,
+  token: string | null,
+  patch: { name?: string; isPublic?: boolean; licenseMode?: PlaylistLicenseMode },
+): Promise<ApiPlaylist> {
   return apiFetch(`/playlist-editor/${id}`, token, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
@@ -61,9 +91,31 @@ export function removeTrackFromPlaylist(playlistId: number, trackId: number, tok
   return apiFetch(`/playlist-editor/${playlistId}/tracks/${trackId}`, token, { method: 'DELETE' });
 }
 
-export function reorderPlaylistTracks(playlistId: number, token: string | null, trackIds: number[]): Promise<ApiPlaylist> {
+// version = celle du dernier etat vu. le backend refuse en 409 si quelqu'un a
+// reordonne entre-temps, plutot que d'ecraser son ordre en silence.
+export function reorderPlaylistTracks(
+  playlistId: number,
+  token: string | null,
+  trackIds: number[],
+  version?: number,
+): Promise<PlaylistState> {
   return apiFetch(`/playlist-editor/${playlistId}/tracks/reorder`, token, {
     method: 'PATCH',
-    body: JSON.stringify({ trackIds }),
+    body: JSON.stringify({ trackIds, version }),
   });
+}
+
+export function listCollaborators(playlistId: number, token: string | null): Promise<PlaylistCollaborator[]> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token);
+}
+
+export function addCollaborator(playlistId: number, token: string | null, userId: number): Promise<unknown> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token, {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function removeCollaborator(playlistId: number, token: string | null, userId: number): Promise<void> {
+  return apiFetch(`/playlist-editor/${playlistId}/collaborators/${userId}`, token, { method: 'DELETE' });
 }
