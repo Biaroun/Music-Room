@@ -1,6 +1,7 @@
 import {
     Controller,
     Post,
+    Delete,
     Body,
     Get,
     Query,
@@ -12,17 +13,20 @@ import {
 } from '@nestjs/common';
 import {RegisterDto} from "./dto/register.dto";
 import {AuthService} from "./auth.service";
-import {ApiTags, ApiOperation, ApiResponse, ApiQuery} from '@nestjs/swagger';
+import {ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiExcludeEndpoint, ApiBearerAuth} from '@nestjs/swagger';
+import {plainToInstance} from "class-transformer";
+import {validate} from "class-validator";
+import {renderResetForm, renderResetResult} from "./reset-password.page";
 import {LoginDto} from "./dto/login.dto";
 import {UsersService} from "../users/users.service";
 import { Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {JwtAuthGuard} from "./guards/jwt-auth.guard";
-import {AuthGuard} from "@nestjs/passport";
+import {GoogleAuthGuard} from "./guards/google-auth.guard";
 import {ResetPasswordDto} from "./dto/ResetPassword.dto";
-import {OAuthProvider} from "../users/user.entity";
 import {ConfigService} from "@nestjs/config";
 import {ThrottleAuth} from "./auth-throttle";
+import {AllowUnverified} from "./decorators/allow-unverified.decorator";
 
 @ApiTags('auth')
 @Controller('auth')
@@ -53,6 +57,7 @@ export class AuthController {
 
     @ApiOperation({ summary: 'Logout' })
     @ApiResponse({ status: 200, description: 'Logged out successfully' })
+    @AllowUnverified()
     @UseGuards(JwtAuthGuard)
     @Post('logout')
     async logout(@NestHeaders('authorization') auth: string) {
@@ -91,9 +96,24 @@ export class AuthController {
         res.send(html);
     }
 
-    @ApiOperation({ summary: 'Redirect to Google OAuth' })
+    // plafonnee comme les routes d'auth : chaque appel envoie un vrai mail
+    @ApiOperation({ summary: 'Send a new verification email to the logged-in user' })
+    @ApiBearerAuth()
+    @ApiResponse({ status: 201, description: 'Verification email sent' })
+    @ApiResponse({ status: 400, description: 'Email already verified' })
+    @ApiResponse({ status: 503, description: 'Email could not be sent' })
+    @ThrottleAuth()
+    @AllowUnverified()
+    @UseGuards(JwtAuthGuard)
+    @Post('resend-verification')
+    async resendVerification(@Req() req: any) {
+        return await this.authService.resendVerification(req.user.id);
+    }
+
+    @ApiOperation({ summary: 'Redirect to Google OAuth (add ?link=<ticket> to link instead of log in)' })
+    @ApiQuery({ name: 'link', required: false, description: 'Ticket from POST /auth/google/link-ticket' })
     @Get('google/web')
-    @UseGuards(AuthGuard('google'))
+    @UseGuards(GoogleAuthGuard)
     async googleAuth() {}
 
     /**
@@ -107,15 +127,22 @@ export class AuthController {
      * d'un utilisateur sur son propre site (open redirect).
      */
     @Get('google/web/callback')
-    @UseGuards(AuthGuard('google'))
-    async googleCallback(@Req() req: any, @Res() res: Response) {
-        const { access_token } = await this.authService.handleOAuthUser(
-            req.user.email,
-            req.user.username,
-            req.user.provider,
-        );
-
+    @UseGuards(GoogleAuthGuard)
+    async googleCallback(@Req() req: any, @Query('state') state: string, @Res() res: Response) {
         const appUrl = this.config.get<string>('OAUTH_APP_REDIRECT');
+
+        // retour d'une liaison : pas de nouveau jwt, l'app est deja connectee
+        if (state) {
+            let fragment = 'linked=1';
+            try {
+                await this.authService.linkGoogle(state, req.user);
+            } catch (e: any) {
+                fragment = `linkError=${encodeURIComponent(e.message)}`;
+            }
+            return appUrl ? res.redirect(`${appUrl}#${fragment}`) : res.json({ result: fragment });
+        }
+
+        const { access_token } = await this.authService.handleGoogleUser(req.user);
         if (!appUrl) {
             // pas d'app configuree : on rend le token tel quel, utile pour
             // tester la route au navigateur. on previent, sinon l'utilisateur
@@ -130,8 +157,25 @@ export class AuthController {
 
     @Post('google/mobile')
     async googleMobile(@Body() body: { token: string }) {
-        const { email, username } = await this.authService.verifyGoogleToken(body.token);
-        return await this.authService.handleOAuthUser(email, username, OAuthProvider.GOOGLE);
+        const identity = await this.authService.verifyGoogleToken(body.token);
+        return await this.authService.handleGoogleUser(identity);
+    }
+
+    @ApiOperation({ summary: 'Get a one-time ticket to link a Google account (then open /auth/google/web?link=<ticket>)' })
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard)
+    @Post('google/link-ticket')
+    async googleLinkTicket(@Req() req: any) {
+        return await this.authService.createGoogleLinkTicket(req.user.id);
+    }
+
+    @ApiOperation({ summary: 'Unlink the Google account' })
+    @ApiBearerAuth()
+    @ApiResponse({ status: 400, description: 'Account has no password, unlinking would lock the user out' })
+    @UseGuards(JwtAuthGuard)
+    @Delete('google/link')
+    async googleUnlink(@Req() req: any) {
+        return await this.authService.unlinkGoogle(req.user.id);
     }
 
     @ApiOperation({ summary: 'Request password reset email' })
@@ -149,5 +193,38 @@ export class AuthController {
     @Post('reset-password')
     async reset_password(@Body() dto: ResetPasswordDto) {
         return await this.authService.resetPassword(dto.token, dto.newPassword);
+    }
+
+    // cible du lien envoye par mail : le post json ci-dessus reste l'api,
+    // cette page est la porte d'entree pour un humain
+    @ApiOperation({ summary: 'Password reset page opened from the email link (HTML)' })
+    @ApiQuery({ name: 'token', description: 'Password reset token', required: true })
+    @ThrottleAuth()
+    @Get('reset-password')
+    async resetPasswordPage(@Query('token') token: string, @Res() res: Response) {
+        const valid = await this.usersService.isPasswordResetTokenValid(token);
+        res.status(valid ? 200 : 400).type('html').send(
+            valid ? renderResetForm(token) : renderResetResult(false),
+        );
+    }
+
+    // le formulaire arrive en urlencoded, pas en json : on valide a la main avec
+    // le meme dto pour rendre les erreurs dans la page plutot qu'en json
+    @ApiExcludeEndpoint()
+    @ThrottleAuth()
+    @Post('reset-password/form')
+    async resetPasswordForm(@Body() body: Record<string, string>, @Res() res: Response) {
+        const token = String(body?.token ?? '');
+        const newPassword = String(body?.newPassword ?? '');
+
+        const dto = plainToInstance(ResetPasswordDto, { token, newPassword });
+        const errors = (await validate(dto)).flatMap((e) => Object.values(e.constraints ?? {}));
+        if (newPassword !== String(body?.passwordConfirm ?? ''))
+            errors.push('Les mots de passe ne correspondent pas.');
+        if (errors.length)
+            return res.status(400).type('html').send(renderResetForm(token, errors));
+
+        const success = await this.usersService.verifyPasswordResetToken(token, newPassword);
+        res.status(success ? 200 : 400).type('html').send(renderResetResult(success));
     }
 }
