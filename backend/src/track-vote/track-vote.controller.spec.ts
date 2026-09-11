@@ -3,6 +3,7 @@ import { TrackVoteController } from './track-vote.controller';
 import { EventService } from './event.service';
 import { TrackVoteService } from './track-vote.service';
 import { TrackVoteGateway } from './track-vote.gateway';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 describe('TrackVoteController', () => {
   let controller: TrackVoteController;
@@ -27,7 +28,11 @@ describe('TrackVoteController', () => {
         { provide: TrackVoteService, useValue: trackVote },
         { provide: TrackVoteGateway, useValue: gateway },
       ],
-    }).compile();
+    })
+      // pas d objet de la verif d email ici, seul le controle metier compte
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<TrackVoteController>(TrackVoteController);
   });

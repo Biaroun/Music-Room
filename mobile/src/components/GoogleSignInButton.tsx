@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import { colors, radius, spacing, typography } from '../config/theme';
-import { API_URL } from '../config/api';
+import { getApiUrl } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import PressableCard from './PressableCard';
@@ -39,7 +39,7 @@ export default function GoogleSignInButton({ label = 'Continue with Google' }: {
         setLoading(true);
         try {
             const appUrl = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
-            const result = await WebBrowser.openAuthSessionAsync(`${API_URL}/auth/google/web`, appUrl);
+            const result = await WebBrowser.openAuthSessionAsync(`${getApiUrl()}/auth/google/web`, appUrl);
 
             if (result.type !== 'success') return; // l'utilisateur a ferme la fenetre
 
