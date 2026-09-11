@@ -84,6 +84,72 @@ describe('UsersService', () => {
     });
   });
 
+  describe('tokens sans valeur', () => {
+    // typeorm ignore une condition undefined : findOne({ where: { token: undefined } })
+    // renverrait le premier user venu
+    it.each([undefined, ''])('verifyEmailToken(%p) ne touche pas la base', async (token) => {
+      await expect(service.verifyEmailToken(token as any)).resolves.toBe(false);
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+
+    it.each([undefined, ''])('isPasswordResetTokenValid(%p) ne touche pas la base', async (token) => {
+      await expect(service.isPasswordResetTokenValid(token as any)).resolves.toBe(false);
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('isPasswordResetTokenValid', () => {
+    it('accepte un token encore valide', async () => {
+      repo.findOne.mockResolvedValue({ id: 1, passwordResetExpires: new Date(Date.now() + 60_000) });
+      await expect(service.isPasswordResetTokenValid('abc')).resolves.toBe(true);
+    });
+
+    it('refuse un token expire', async () => {
+      repo.findOne.mockResolvedValue({ id: 1, passwordResetExpires: new Date(Date.now() - 1) });
+      await expect(service.isPasswordResetTokenValid('abc')).resolves.toBe(false);
+    });
+
+    it('refuse un token inconnu', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.isPasswordResetTokenValid('abc')).resolves.toBe(false);
+    });
+  });
+
+  describe('availableUsername', () => {
+    // le nom google ("Bob Martin") ne passe pas la regle des usernames et
+    // deux homonymes feraient sauter la contrainte unique
+    it('nettoie le nom google', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.availableUsername('Élodie Martin-Dupont')).resolves.toBe('Elodie_Martin-Dupont');
+    });
+
+    it('ajoute un suffixe si le nom est pris', async () => {
+      repo.findOne.mockResolvedValueOnce({ id: 1 }).mockResolvedValue(null);
+      await expect(service.availableUsername('Bob')).resolves.toMatch(/^Bob_\d{4}$/);
+    });
+
+    it('retombe sur "user" si rien n\'est gardable', async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.availableUsername('李小龙')).resolves.toBe('user');
+    });
+  });
+
+  describe('attachGoogle', () => {
+    const identity = { googleId: 'g-1', email: 'Bob@Gmail.com', username: 'Bob' };
+
+    it('valide l\'email quand google prouve la meme adresse', async () => {
+      await service.attachGoogle({ id: 1, email: 'bob@gmail.com' } as any, identity);
+      expect(repo.update).toHaveBeenCalledWith(1, {
+        googleId: 'g-1', googleEmail: 'Bob@Gmail.com', emailisVerified: true,
+      });
+    });
+
+    it('ne touche pas a la validation pour une autre adresse', async () => {
+      await service.attachGoogle({ id: 1, email: 'bob@test.local' } as any, identity);
+      expect(repo.update).toHaveBeenCalledWith(1, { googleId: 'g-1', googleEmail: 'Bob@Gmail.com' });
+    });
+  });
+
   describe('searchByUsername', () => {
     it('includes avatar in the selected columns', async () => {
       const qb: any = {
