@@ -8,8 +8,9 @@ import Screen from '../components/Screen';
 import Field from '../components/Field';
 import Button from '../components/Button';
 
-// ecran mot de passe oublie : on saisit l'email, le back envoie un lien de reset par mail.
-// route /auth/forgot-password a faire cote back (Biaroun), en attendant l'appel echoue juste.
+// on saisit l'email, le back envoie un lien de reset par mail. le lien ouvre
+// une page servie par le back (GET /auth/reset-password) ou l'on choisit le
+// nouveau mot de passe, puis on revient se connecter ici
 export default function ForgotPasswordScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +28,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       // message neutre expres, on dit pas si l'email existe (secu)
       showToast({
         type: 'success',
-        message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
+        message: 'Si un compte existe avec cet email, un lien valable 15 minutes vient d\'être envoyé.',
       });
       navigation.goBack();
     } catch (e: any) {
