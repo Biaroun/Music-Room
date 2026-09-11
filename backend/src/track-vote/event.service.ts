@@ -7,6 +7,7 @@ import { Playlist } from '../playlist-editor/playlist.entity';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { haversineDistanceMeters } from './geo.util';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 export type VoterPosition = { latitude: number; longitude: number };
 
@@ -26,9 +27,22 @@ export class EventService {
         @InjectRepository(Event) private events: Repository<Event>,
         @InjectRepository(EventInvite) private invites: Repository<EventInvite>,
         @InjectRepository(Playlist) private playlists: Repository<Playlist>,
+        private subscription: SubscriptionService,
     ) {}
 
+    /**
+     * bonus VI.3 : creer et gerer un event est reserve au plan premium (pas de
+     * paiement reel, juste la bascule d'etat sur l'utilisateur). rejoindre et
+     * voter reste ouvert a tous, gate uniquement la creation/gestion.
+     */
+    private async assertPremium(userId: number): Promise<void> {
+        if (!(await this.subscription.isPremium(userId))) {
+            throw new ForbiddenException('Creating and managing Track Vote events requires a Premium subscription');
+        }
+    }
+
     async create(ownerId: number, dto: CreateEventDto): Promise<Event> {
+        await this.assertPremium(ownerId);
         const playlist = await this.playlists.findOne({ where: { id: dto.playlistId } });
         if (!playlist) throw new NotFoundException('Playlist not found');
 
@@ -109,6 +123,10 @@ export class EventService {
     private async findManageable(id: number, ownerId: number): Promise<Event> {
         const event = await this.findOne(id);
         if (event.owner.id !== ownerId) throw new ForbiddenException('Not your event');
+        // un event cree pendant l'abonnement reste a l'owner, mais devient
+        // ineditable s'il resilie : la gestion exige le plan premium a chaque
+        // action, pas seulement a la creation.
+        await this.assertPremium(ownerId);
         return event;
     }
 

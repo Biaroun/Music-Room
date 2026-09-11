@@ -5,12 +5,14 @@ import { EventService } from './event.service';
 import { Event, EventLicenseMode, EventVisibility } from './event.entity';
 import { EventInvite } from './event-invite.entity';
 import { Playlist } from '../playlist-editor/playlist.entity';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 describe('EventService', () => {
   let service: EventService;
   let events: { findOne: jest.Mock; find: jest.Mock; create: jest.Mock; save: jest.Mock; remove: jest.Mock };
   let invites: { findOne: jest.Mock; find: jest.Mock; create: jest.Mock; save: jest.Mock; delete: jest.Mock };
   let playlists: { findOne: jest.Mock };
+  let subscription: { isPremium: jest.Mock };
 
   const owner = { id: 1, username: 'owner' };
   const OTHER_USER = 2;
@@ -36,6 +38,9 @@ describe('EventService', () => {
     events = { findOne: jest.fn(), find: jest.fn(), create: jest.fn(), save: jest.fn(), remove: jest.fn() };
     invites = { findOne: jest.fn(), find: jest.fn(), create: jest.fn(), save: jest.fn(), delete: jest.fn() };
     playlists = { findOne: jest.fn() };
+    // premium par defaut : la plupart des tests ici portent sur
+    // assertCanView/assertCanVote, pas sur la gate d'abonnement (testee a part)
+    subscription = { isPremium: jest.fn().mockResolvedValue(true) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +48,7 @@ describe('EventService', () => {
         { provide: getRepositoryToken(Event), useValue: events },
         { provide: getRepositoryToken(EventInvite), useValue: invites },
         { provide: getRepositoryToken(Playlist), useValue: playlists },
+        { provide: SubscriptionService, useValue: subscription },
       ],
     }).compile();
 
@@ -208,6 +214,40 @@ describe('EventService', () => {
       await expect(
         service.assertCanVote(10, OTHER_USER, { latitude: 48.851, longitude: 2.351 }),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('bonus VI.3 : creer/gerer un event exige le plan premium', () => {
+    it('rejects create() when the requester is not premium', async () => {
+      subscription.isPremium.mockResolvedValue(false);
+
+      await expect(
+        service.create(owner.id, { name: 'Party', playlistId: 5 } as any),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(playlists.findOne).not.toHaveBeenCalled();
+    });
+
+    it('allows create() when the requester is premium', async () => {
+      subscription.isPremium.mockResolvedValue(true);
+      playlists.findOne.mockResolvedValue({ id: 5 });
+      events.create.mockReturnValue({ id: 10 });
+      events.save.mockResolvedValue({ id: 10 });
+
+      await expect(service.create(owner.id, { name: 'Party', playlistId: 5 } as any)).resolves.toBeDefined();
+    });
+
+    it('rejects managing an existing event (update) once the owner is no longer premium', async () => {
+      events.findOne.mockResolvedValue(baseEvent());
+      subscription.isPremium.mockResolvedValue(false);
+
+      await expect(service.update(10, owner.id, {} as any)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('still rejects a non-owner managing the event before even checking premium', async () => {
+      events.findOne.mockResolvedValue(baseEvent());
+      subscription.isPremium.mockResolvedValue(true);
+
+      await expect(service.update(10, OTHER_USER, {} as any)).rejects.toBeInstanceOf(ForbiddenException);
     });
   });
 });

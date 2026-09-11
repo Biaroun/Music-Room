@@ -9,8 +9,17 @@ import { useToast } from '../components/Toast';
 import Screen from '../components/Screen';
 import Field from '../components/Field';
 import Button from '../components/Button';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { subscribe, cancelSubscription, type SubscriptionPlan } from '../lib/subscription';
 
-type Me = { id: number; username: string; email: string; emailisVerified: boolean };
+type Me = {
+  id: number;
+  username: string;
+  email: string;
+  emailisVerified: boolean;
+  plan: SubscriptionPlan;
+  subscribedAt: string | null;
+};
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/;
 
@@ -21,6 +30,8 @@ export default function SettingsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPwd, setSavingPwd] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'subscribe' | 'cancel' | null>(null);
 
   const [newemail, setNewemail] = useState('');
   const [emailPwd, setEmailPwd] = useState('');
@@ -61,6 +72,25 @@ export default function SettingsScreen({ navigation }: any) {
       setCurPwd(''); setNewPwd(''); setNewPwdConfirm('');
     } catch (e: any) { showToast({ type: 'error', message: e.message }); }
     finally { setSavingPwd(false); }
+  }
+
+  async function confirmSubscriptionChange() {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (!action) return;
+    setSubscribing(true);
+    try {
+      const status = action === 'subscribe' ? await subscribe(token) : await cancelSubscription(token);
+      setMe((prev) => (prev ? { ...prev, plan: status.plan, subscribedAt: status.subscribedAt } : prev));
+      showToast({
+        type: 'success',
+        message: action === 'subscribe' ? 'Premium activated — check your inbox' : 'Subscription cancelled — check your inbox',
+      });
+    } catch (e: any) {
+      showToast({ type: 'error', message: e.message });
+    } finally {
+      setSubscribing(false);
+    }
   }
 
   // Validation affichée pendant la saisie plutôt qu'en pop-up après coup.
@@ -155,14 +185,68 @@ export default function SettingsScreen({ navigation }: any) {
         />
       </View>
 
+      <Text style={[typography.h2, ui.section]}>Subscription</Text>
+      <View style={ui.card}>
+        <View style={styles.planRow}>
+          <View style={[ui.badge, { backgroundColor: me?.plan === 'premium' ? colors.accentSoft : colors.surfaceAlt }]}>
+            <Ionicons
+              name={me?.plan === 'premium' ? 'star' : 'star-outline'}
+              size={13}
+              color={me?.plan === 'premium' ? colors.accent : colors.textSecondary}
+            />
+            <Text style={[ui.badgeText, { color: me?.plan === 'premium' ? colors.accent : colors.textSecondary }]}>
+              {me?.plan === 'premium' ? 'Premium' : 'Free'}
+            </Text>
+          </View>
+          <Text style={typography.caption}>
+            {me?.plan === 'premium'
+              ? 'You can create and manage Track Vote events.'
+              : 'You can join and vote in Track Vote events. Upgrade to create and manage your own.'}
+          </Text>
+        </View>
+        {me?.plan === 'premium' ? (
+          <Button
+            title="Cancel subscription"
+            icon="close-circle-outline"
+            variant="danger"
+            onPress={() => setConfirmAction('cancel')}
+            loading={subscribing}
+            style={{ marginTop: spacing.sm }}
+          />
+        ) : (
+          <Button
+            title="Subscribe to Premium"
+            icon="star"
+            onPress={() => setConfirmAction('subscribe')}
+            loading={subscribing}
+            style={{ marginTop: spacing.sm }}
+          />
+        )}
+      </View>
+
       <Text style={[typography.h2, ui.section]}>Session</Text>
       <Button title="Back to Home" icon="arrow-back" variant="secondary" onPress={() => navigation.goBack()} />
       <Button title="Log out" icon="log-out-outline" variant="danger" onPress={logout} style={{ marginTop: spacing.sm }} />
+
+      <ConfirmDialog
+        visible={confirmAction != null}
+        title={confirmAction === 'subscribe' ? 'Subscribe to Premium?' : 'Cancel your subscription?'}
+        message={
+          confirmAction === 'subscribe'
+            ? 'This is a demo confirmation — no real payment is taken. You will be able to create and manage Track Vote events.'
+            : 'You will go back to the Free plan: you can still join and vote in events, but not create or manage new ones.'
+        }
+        confirmLabel={confirmAction === 'subscribe' ? 'Subscribe' : 'Cancel subscription'}
+        destructive={confirmAction === 'cancel'}
+        onConfirm={confirmSubscriptionChange}
+        onCancel={() => setConfirmAction(null)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  planRow: { gap: spacing.sm },
   account: {
     flexDirection: 'row',
     alignItems: 'center',

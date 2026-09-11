@@ -46,4 +46,28 @@ export class MailService {
         `,
         });
     }
+
+    async sendSubscriptionConfirmedEmail(to: string): Promise<void> {
+        await this.transporter.sendMail({
+            from: '"Music Room" <noreply@musicroom.com>',
+            to,
+            subject: 'Your Music Room Premium subscription is active',
+            html: `
+            <h2>Welcome to Music Room Premium</h2>
+            <p>Your subscription is now active. You can create and manage Track Vote events.</p>
+        `,
+        });
+    }
+
+    async sendSubscriptionCancelledEmail(to: string): Promise<void> {
+        await this.transporter.sendMail({
+            from: '"Music Room" <noreply@musicroom.com>',
+            to,
+            subject: 'Your Music Room Premium subscription was cancelled',
+            html: `
+            <h2>Subscription cancelled</h2>
+            <p>Your Premium subscription has been cancelled. You can still join and vote in Track Vote events, but creating and managing new ones now requires Premium.</p>
+        `,
+        });
+    }
 }

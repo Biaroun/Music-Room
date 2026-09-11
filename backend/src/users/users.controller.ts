@@ -45,6 +45,8 @@ export class UsersController {
             avatar: fulluser.avatar,
             visibilitySettings: fulluser.visibilitySettings,
             oAuthProvider: fulluser.oAuthProvider,
+            plan: fulluser.plan,
+            subscribedAt: fulluser.subscribedAt,
             createdAt: fulluser.createdAt,
             updatedAt: fulluser.updatedAt,
         };

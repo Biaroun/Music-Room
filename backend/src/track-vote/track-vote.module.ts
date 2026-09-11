@@ -12,10 +12,12 @@ import { EventInvite } from './event-invite.entity';
 import { Vote } from './vote.entity';
 import { Playlist } from '../playlist-editor/playlist.entity';
 import { PlaylistTrack } from '../playlist-editor/playlist-track.entity';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Event, EventInvite, Vote, Playlist, PlaylistTrack]),
+    SubscriptionModule,
     // AuthModule n'exporte pas JwtModule : on le reenregistre avec le meme
     // secret pour que le gateway puisse verifier le token de la poignee de main
     // (meme pattern que ListeningModule).

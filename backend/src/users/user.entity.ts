@@ -12,6 +12,14 @@ export enum OAuthProvider {
   FACEBOOK = 'facebook',
 }
 
+// bonus VI.3 : pas de logique de paiement, juste la bascule d'etat. PREMIUM
+// donne le droit de creer/gerer des track-vote events, FREE ne permet que d'y
+// participer (rejoindre, voter).
+export enum SubscriptionPlan {
+  FREE = 'free',
+  PREMIUM = 'premium',
+}
+
 
 export enum MusicGenre {
   RAP = 'rap',
@@ -92,7 +100,13 @@ export class User {
 
   @Column({ type: 'timestamp', nullable: true })
   passwordResetExpires: Date | null;
-  
+
+  @Column({ type: 'enum', enum: SubscriptionPlan, default: SubscriptionPlan.FREE })
+  plan: SubscriptionPlan;
+
+  @Column({ type: 'timestamp', nullable: true })
+  subscribedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

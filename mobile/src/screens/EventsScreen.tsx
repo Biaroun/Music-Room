@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, layout, radius, shadows, spacing, typography } from '../config/theme';
 import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../config/api';
 import { useToast } from '../components/Toast';
 import Screen, { useBottomInset } from '../components/Screen';
 import PressableCard from '../components/PressableCard';
@@ -21,6 +22,10 @@ export default function EventsScreen({ navigation }: any) {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState<ApiPlaylist[]>([]);
   const [creating, setCreating] = useState(false);
+  // bonus VI.3 : creer un event est reserve au plan premium. le backend est
+  // la vraie limite (403 sinon), ceci n'est qu'un raccourci d'affichage pour
+  // rediriger vers l'abonnement plutot que de laisser echouer l'appel.
+  const [isPremium, setIsPremium] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,11 +34,18 @@ export default function EventsScreen({ navigation }: any) {
         .then((data) => { if (active) setEvents(data); })
         .catch(() => { if (active) showToast({ type: 'error', message: 'Failed to load events' }); })
         .finally(() => { if (active) setLoading(false); });
+      apiFetch('/users/me', token)
+        .then((me) => { if (active) setIsPremium(me.plan === 'premium'); })
+        .catch(() => {});
       return () => { active = false; };
     }, [token]),
   );
 
   async function openPicker() {
+    if (!isPremium) {
+      navigation.navigate('Settings');
+      return;
+    }
     try {
       const playlists = await listMyPlaylists(token);
       if (playlists.length === 0) {
@@ -87,8 +99,12 @@ export default function EventsScreen({ navigation }: any) {
           <EmptyState
             icon="bar-chart-outline"
             title="No events yet"
-            message="Start an event from one of your playlists and let people vote for the next track."
-            actionLabel="New Event"
+            message={
+              isPremium
+                ? 'Start an event from one of your playlists and let people vote for the next track.'
+                : 'Free plan lets you join and vote in events. Upgrade to Premium to create and manage your own.'
+            }
+            actionLabel={isPremium ? 'New Event' : 'Upgrade to Premium'}
             onAction={openPicker}
           />
         }
@@ -149,7 +165,12 @@ export default function EventsScreen({ navigation }: any) {
 
       {events.length > 0 && (
         <View style={[styles.fabWrap, { bottom: bottomInset + spacing.md }]}>
-          <Button title="New Event" icon="add" onPress={openPicker} style={[styles.fab, shadows.floating]} />
+          <Button
+            title={isPremium ? 'New Event' : 'Upgrade to Premium'}
+            icon={isPremium ? 'add' : 'star'}
+            onPress={openPicker}
+            style={[styles.fab, shadows.floating]}
+          />
         </View>
       )}
 
