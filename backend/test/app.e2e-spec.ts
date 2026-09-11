@@ -2,8 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import * as bcrypt from 'bcrypt';
 import { AppModule } from './../src/app.module';
 import { AUTH_THROTTLE_LIMIT } from './../src/auth/auth-throttle';
+import { UsersService } from './../src/users/users.service';
+import { Visibility } from './../src/users/user.entity';
 
 // remplace le test boilerplate de nest (GET / -> "Hello World!"), qui visait un
 // AppController qui n'a jamais existe ici et restait donc rouge en permanence.
@@ -50,5 +53,34 @@ describe('Music Room (e2e)', () => {
 
         expect(codes.slice(0, AUTH_THROTTLE_LIMIT)).toEqual(Array(AUTH_THROTTLE_LIMIT).fill(401));
         expect(codes.slice(AUTH_THROTTLE_LIMIT)).toEqual([429, 429, 429]);
+    });
+
+    // sujet v.1 : un compte non verifie garde un jwt valide (pour se
+    // deconnecter et redemander un mail) mais pas d'acces au reste de l'api
+    it('bloque une route protegee pour un compte non verifie', async () => {
+        const usersService = app.get(UsersService);
+        const password = 'MotDePasse12!';
+        const email = `non-verifie-${Date.now()}@musicroom.local`;
+
+        await usersService.create({
+            email,
+            username: `nv_${Date.now()}`,
+            password: await bcrypt.hash(password, 10),
+            visibilitySettings: {
+                username: Visibility.PUBLIC,
+                bio: Visibility.PUBLIC,
+                musicPreferences: Visibility.PUBLIC,
+            },
+        });
+
+        const login = await request(app.getHttpServer())
+            .post('/auth/login')
+            .send({ login: email, password })
+            .expect(201);
+
+        await request(app.getHttpServer())
+            .get('/playlist-editor')
+            .set('Authorization', `Bearer ${login.body.access_token}`)
+            .expect(403);
     });
 });
