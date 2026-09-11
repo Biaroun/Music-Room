@@ -20,6 +20,8 @@ type ScreenProps = {
   scroll?: boolean;
   /** colonne etroite : formulaires d'authentification */
   narrow?: boolean;
+  /** colonne large : grilles a plusieurs colonnes (playlists, events) */
+  wide?: boolean;
   /** centre le contenu verticalement */
   center?: boolean;
   padded?: boolean;
@@ -35,6 +37,7 @@ export default function Screen({
   children,
   scroll = true,
   narrow = false,
+  wide = false,
   center = false,
   padded = true,
   style,
@@ -43,7 +46,7 @@ export default function Screen({
   const bottomInset = useBottomInset();
   const column = [
     styles.column,
-    { maxWidth: narrow ? layout.maxWidthNarrow : layout.maxWidth },
+    { maxWidth: narrow ? layout.maxWidthNarrow : wide ? layout.maxWidthWide : layout.maxWidth },
     padded && styles.padded,
     contentContainerStyle,
   ];

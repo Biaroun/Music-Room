@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Pressable, useWindowDimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, layout, radius, spacing, shadows, typography } from '../config/theme';
@@ -15,6 +15,9 @@ export default function PlaylistsScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
   const bottomInset = useBottomInset();
+  const { width } = useWindowDimensions();
+  // 2 colonnes des qu'on a la place (web / tablette), 1 sur telephone
+  const columns = width >= layout.wideBreakpoint ? 2 : 1;
   const [playlists, setPlaylists] = useState<ApiPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -61,9 +64,12 @@ export default function PlaylistsScreen({ navigation }: any) {
   }
 
   return (
-    <Screen scroll={false} padded={false}>
+    <Screen scroll={false} padded={false} wide>
       <FlatList
+        key={columns}
         data={playlists}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
         keyExtractor={(p) => String(p.id)}
         contentContainerStyle={[styles.list, { paddingBottom: bottomInset + 88 }]}
         showsVerticalScrollIndicator={false}
@@ -85,7 +91,7 @@ export default function PlaylistsScreen({ navigation }: any) {
         }
         renderItem={({ item }) => (
           <PressableCard
-            style={styles.row}
+            style={[styles.row, columns > 1 && styles.rowGrid]}
             onPress={() => navigation.navigate('PlaylistEditor', { playlistId: item.id })}
             accessibilityLabel={item.name}
           >
@@ -142,8 +148,10 @@ export default function PlaylistsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: spacing.md, width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
+  list: { padding: spacing.md, width: '100%', alignSelf: 'center' },
   count: { marginBottom: spacing.sm, marginLeft: 2 },
+  // colonnes du haut alignees, meme largeur : cf. Screen wide sur cet ecran
+  gridRow: { gap: spacing.md },
 
   row: {
     flexDirection: 'row',
@@ -156,6 +164,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm + 2,
     marginBottom: spacing.sm,
   },
+  rowGrid: { flex: 1 },
   art: {
     width: 48,
     height: 48,

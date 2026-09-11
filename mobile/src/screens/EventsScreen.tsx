@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Modal, Pressable, useWindowDimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, layout, radius, shadows, spacing, typography } from '../config/theme';
@@ -26,6 +26,9 @@ export default function EventsScreen({ navigation }: any) {
   // la vraie limite (403 sinon), ceci n'est qu'un raccourci d'affichage pour
   // rediriger vers l'abonnement plutot que de laisser echouer l'appel.
   const [isPremium, setIsPremium] = useState(true);
+  const { width } = useWindowDimensions();
+  // 2 colonnes des qu'on a la place (web / tablette), 1 sur telephone
+  const columns = width >= layout.wideBreakpoint ? 2 : 1;
 
   useFocusEffect(
     useCallback(() => {
@@ -81,9 +84,12 @@ export default function EventsScreen({ navigation }: any) {
   }
 
   return (
-    <Screen scroll={false} padded={false}>
+    <Screen scroll={false} padded={false} wide>
       <FlatList
+        key={columns}
         data={events}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
         keyExtractor={(e) => String(e.id)}
         contentContainerStyle={[styles.list, { paddingBottom: bottomInset + 88 }]}
         showsVerticalScrollIndicator={false}
@@ -110,7 +116,7 @@ export default function EventsScreen({ navigation }: any) {
         }
         renderItem={({ item }) => (
           <PressableCard
-            style={[styles.row, !item.canVote && styles.rowMuted]}
+            style={[styles.row, !item.canVote && styles.rowMuted, columns > 1 && styles.rowGrid]}
             onPress={() => navigation.navigate('TrackVote', { eventId: item.id })}
             accessibilityLabel={item.name}
           >
@@ -206,8 +212,10 @@ export default function EventsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: spacing.md, width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
+  list: { padding: spacing.md, width: '100%', alignSelf: 'center' },
   intro: { ...typography.caption, marginBottom: spacing.md, lineHeight: 17 },
+  // colonnes du haut alignees, meme largeur : cf. Screen wide sur cet ecran
+  gridRow: { gap: spacing.md },
 
   row: {
     flexDirection: 'row',
@@ -221,6 +229,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   rowMuted: { opacity: 0.7 },
+  rowGrid: { flex: 1 },
   art: {
     width: 48,
     height: 48,

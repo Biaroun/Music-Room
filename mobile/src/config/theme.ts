@@ -51,6 +51,9 @@ export const radius = {
 export const layout = {
     maxWidth: 760,
     maxWidthNarrow: 420,
+    // grilles a 2 colonnes (playlists, events) : des cartes plus chargees en texte
+    // que les tuiles de Home, il leur faut plus de place que maxWidth
+    maxWidthWide: 1100,
     wideBreakpoint: 700,
 };
 
