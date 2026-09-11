@@ -46,6 +46,8 @@ export class UsersService {
         visibilitySettings: true,
         emailVerificationToken: true,
         emailVerificationExpires: true,
+        plan: true,
+        subscribedAt: true,
         createdAt: true,
         updatedAt: true,
       }

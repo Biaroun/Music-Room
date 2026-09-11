@@ -13,17 +13,11 @@ cd mobile && npm install && npm start
 ```
 
 ---
-### Mail (Mailtrap)
-Le projet utilise [Mailtrap](https://mailtrap.io) en mode **Sandbox** pour tester l'envoi d'emails (vérification de compte) sans jamais envoyer de vrais mails à de vraies adresses.
+### Mail (Ethereal)
+Par défaut (`MAIL_HOST=ethereal` dans `.env`), le projet envoie ses emails (vérification de compte, reset mot de passe, confirmation/résiliation d'abonnement) via [Ethereal](https://ethereal.email), un faux SMTP de test : rien n'est jamais livré à une vraie adresse, chaque envoi loggue un lien de prévisualisation côté backend et arrive dans une boîte web dédiée.
 
-1. Crée un compte gratuit sur [mailtrap.io](https://mailtrap.io)
-2. Va dans **Sandboxes** (menu de gauche) → ouvre **My Sandbox** (créée par défaut)
-3. Dans l'onglet **Integration**, choisis **SMTP**, tu trouveras :
-  - `Host` → à mettre dans `MAIL_HOST`
-  - `Port` → à mettre dans `MAIL_PORT` (utiliser `2525`)
-  - `Username` → à mettre dans `MAIL_USER`
-  - `Password` → à mettre dans `MAIL_PASSWORD`
-4. Les emails de vérification envoyés par l'app n'arrivent jamais dans une vraie boîte mail — ils apparaissent directement dans l'inbox Mailtrap, pratique pour debug sans spammer personne.
+1. Une boîte de test fixe est déjà configurée (`MAIL_USER`/`MAIL_PASSWORD` dans `.env`) : connecte-toi sur [ethereal.email/login](https://ethereal.email/login) avec ces identifiants pour consulter les mails.
+2. Pour utiliser un vrai fournisseur SMTP (Brevo, etc.) à la place : renseigne `MAIL_HOST` (l'hôte réel, pas `ethereal`), `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` et `MAIL_FROM` (doit être un expéditeur vérifié chez le fournisseur, sinon les mails sont filtrés silencieusement par les destinataires).
 
 ## Accéder au backend depuis l'émulateur
 
