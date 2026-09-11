@@ -24,9 +24,6 @@ const SHORTCUTS: Shortcut[] = [
   { title: 'Friends', subtitle: 'Your circle', icon: 'people', screen: 'Friends', color: '#22d3ee' },
   { title: 'My Profile', subtitle: 'Bio & tastes', icon: 'person', screen: 'Profile', color: '#8b5cf6' },
   { title: 'Track Vote', subtitle: 'Pick the next', icon: 'bar-chart', screen: 'Events', color: '#e8115b' },
-  // le back n'existe pas encore : on le dit ici plutot que de le laisser
-  // decouvrir apres le clic
-  { title: 'Delegation', subtitle: 'Not yet available', icon: 'git-network', screen: 'MusicDelegation', color: '#f59e0b' },
   { title: 'Settings', subtitle: 'Your account', icon: 'settings', screen: 'Settings', color: '#3b82f6' },
 ];
 
