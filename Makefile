@@ -59,6 +59,10 @@ API_URL ?= http://localhost:3000
 
 seed-users:
 	API_URL=$(API_URL) node scripts/seed-users.js
+	@# comptes de demo sans vraie boite mail : on les valide en base, sinon
+	@# l'app les bloque sur l'ecran de verification
+	docker compose exec -T postgres psql -U postgres -d musicroom -c \
+		"UPDATE \"user\" SET \"emailisVerified\" = true WHERE email LIKE 'seed.%@musicroom.local';"
 
 # --- Test de charge (sujet V.7) --- voir docs/ramp-up.md
 PEAK_VUS ?= 200

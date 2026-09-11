@@ -24,6 +24,8 @@ import FriendsScreen from './src/screens/FriendsScreen';
 import EventsScreen from './src/screens/EventsScreen';
 import TrackVoteScreen from './src/screens/TrackVoteScreen';
 import MusicDelegationScreen from './src/screens/MusicDelegationScreen';
+import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
+import ServerSettingsScreen from './src/screens/ServerSettingsScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -52,7 +54,8 @@ function releaseFocusOnNavigate() {
 }
 
 function Navigation() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, account } = useAuth();
+  const mustVerifyEmail = isAuthenticated && account !== null && !account.emailisVerified;
   if (isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
@@ -72,7 +75,9 @@ function Navigation() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      {isAuthenticated ? (
+      {mustVerifyEmail ? (
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} options={{ headerShown: false }} />
+      ) : isAuthenticated ? (
         <>
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Music Room' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
@@ -90,6 +95,7 @@ function Navigation() {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create an account' }} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Mot de passe oublié' }} />
+          <Stack.Screen name="ServerSettings" component={ServerSettingsScreen} options={{ title: 'Server' }} />
         </>
       )}
     </Stack.Navigator>

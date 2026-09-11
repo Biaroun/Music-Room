@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { API_URL, apiFetch } from '../config/api';
+import { apiFetch, getApiUrl } from '../config/api';
 import { DEVICE_CONTEXT } from '../config/device';
 import { useAuth } from './AuthContext';
 import { useToast } from '../components/Toast';
@@ -115,7 +115,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
         // transports websocket only : en React Native le polling XHR d'engine.io
         // pose plus de problemes qu'il n'en resout
-        const socket = io(`${API_URL}/realtime`, {
+        const socket = io(`${getApiUrl()}/realtime`, {
             transports: ['websocket'],
             // le triplet v.6 voyage dans le payload du handshake : pas d'en-tete
             // par message en websocket, et une partie des actions ne passe plus
