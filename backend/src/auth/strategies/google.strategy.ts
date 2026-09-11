@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
-import { OAuthProvider } from '../../users/user.entity';
+import { GoogleIdentity } from '../../users/user.entity';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -17,11 +17,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         });
     }
 
-    async validate(accessToken: string, refreshToken: string, profile: any) {
+    async validate(accessToken: string, refreshToken: string, profile: any): Promise<GoogleIdentity> {
+        const email = profile.emails?.[0]?.value;
+        // une adresse non verifiee chez google ne prouve rien
+        if (!email || profile._json?.email_verified === false)
+            throw new UnauthorizedException('Google account has no verified email');
         return {
-            email: profile.emails[0].value,
-            username: profile.displayName,
-            provider: OAuthProvider.GOOGLE,
+            googleId: profile.id,
+            email,
+            username: profile.displayName || email.split('@')[0],
         };
     }
 }

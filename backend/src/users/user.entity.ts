@@ -46,6 +46,13 @@ export interface VisibilitySettings {
 // est PRIVATE, pour se rendre invisible meme d'eux
 export const LISTENING_VISIBILITY_DEFAULT = Visibility.FRIENDS_ONLY;
 
+// ce qu'on garde d'un compte google, qu'il vienne du flux web ou d'un id token
+export interface GoogleIdentity {
+  googleId: string;
+  email: string;
+  username: string;
+}
+
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -68,6 +75,14 @@ export class User {
 
   @Column({ type: 'enum', enum: OAuthProvider, default: OAuthProvider.LOCAL })
   oAuthProvider: OAuthProvider;
+
+  // claim sub de google : stable, contrairement a l'email qui peut changer.
+  // c'est lui qui retrouve un compte lie, l'email n'est affiche que pour l'ui
+  @Column({ type: 'varchar', unique: true, nullable: true, select: false })
+  googleId: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  googleEmail: string | null;
 
   @Column({ nullable: true })
   bio: string;
