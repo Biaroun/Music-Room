@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 
 const API_URL = process.env.API_URL || 'http://localhost:3000';
 const CREDENTIALS_FILE = path.join(__dirname, '..', 'backend', '.env.seed-users');
@@ -61,23 +62,27 @@ async function apiRequest(pathName, { method = 'GET', token = null, body = null 
   return data;
 }
 
+// pas de vraie boite mail, on valide le compte direct en base
+function markEmailVerified(email) {
+  execFileSync(
+    'docker',
+    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'musicroom',
+      '-v', 'ON_ERROR_STOP=1', '-v', `email=${email}`],
+    {
+      cwd: path.join(__dirname, '..'),
+      input: `UPDATE "user" SET "emailisVerified" = true WHERE email = :'email';`,
+      stdio: ['pipe', 'ignore', 'inherit'],
+    }
+  );
+}
+
 async function createUser(spec) {
   const password = generatePassword();
-  let token;
-  try {
-    ({ access_token: token } = await apiRequest('/auth/register', {
-      method: 'POST',
-      body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
-    }));
-  } catch (err) {
-    // bug backend connu : /auth/register cree le user puis renvoie 500 si le
-    // mail de verification est rate-limite. le compte existe quand meme, donc
-    // on retente par login avant d'abandonner.
-    ({ access_token: token } = await apiRequest('/auth/login', {
-      method: 'POST',
-      body: { login: spec.email, password },
-    }));
-  }
+  const { access_token: token } = await apiRequest('/auth/register', {
+    method: 'POST',
+    body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
+  });
+  markEmailVerified(spec.email);
 
   const me = await apiRequest('/users/me', { token });
   await apiRequest('/users/me', { method: 'PATCH', token, body: { avatar: spec.avatar } });
