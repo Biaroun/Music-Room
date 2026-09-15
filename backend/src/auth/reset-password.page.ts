@@ -1,6 +1,7 @@
 // page ouverte depuis le lien du mail de reset. html pur sans js : elle marche
 // dans n'importe quel navigateur, y compris celui du telephone
 
+// escape the html chars (No XSS with the token or the errors)
 function escapeHtml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -43,6 +44,7 @@ function layout(body: string): string {
 </html>`;
 }
 
+// render the new password form (with the errors on top if any)
 export function renderResetForm(token: string, errors: string[] = []): string {
     const list = errors.length
         ? `<ul class="errors">${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
@@ -61,6 +63,7 @@ export function renderResetForm(token: string, errors: string[] = []): string {
       </form>`);
 }
 
+// render the success or expired link page
 export function renderResetResult(success: boolean): string {
     return success
         ? layout(`

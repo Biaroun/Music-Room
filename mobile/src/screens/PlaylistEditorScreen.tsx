@@ -34,6 +34,7 @@ type Track = ApiPlaylistTrack;
 // utilise seulement quand le websocket ne passe pas, meme cadence que RealtimeContext.
 const FALLBACK_POLL_MS = 20_000;
 
+// playlist track to a player track (id as string like deezer)
 function toPreviewTrack(tk: Track): PreviewTrack {
   return {
     id: String(tk.id),
@@ -46,6 +47,7 @@ function toPreviewTrack(tk: Track): PreviewTrack {
   };
 }
 
+// edit a playlist (name visibility license tracks order editors) live with the socket
 export default function PlaylistEditorScreen({ route }: any) {
   const playlistId: number = route.params.playlistId;
   const { token } = useAuth();
@@ -68,6 +70,7 @@ export default function PlaylistEditorScreen({ route }: any) {
   const [collaborators, setCollaborators] = useState<PlaylistCollaborator[]>([]);
   const [friends, setFriends] = useState<{ friendId: number; username: string }[]>([]);
 
+  // join the playlist room and leave it when we quit the screen (sinon double room)
   useEffect(() => {
     joinPlaylist(playlistId);
     return () => leavePlaylist(playlistId);
@@ -90,6 +93,7 @@ export default function PlaylistEditorScreen({ route }: any) {
       .catch(() => showToast({ type: 'error', message: 'Failed to load playlist' }));
   }, [playlistId, token]);
 
+  // first load then stop the spinner
   useEffect(() => {
     loadFromRest().finally(() => setLoading(false));
   }, [loadFromRest]);
@@ -112,6 +116,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     setCollaborators(playlistState.collaborators);
   }, [playlistState, playlistId]);
 
+  // owner only = load my friends to invite them as editors
   useEffect(() => {
     if (!isOwner) return;
     apiFetch('/friendship/friends', token)
@@ -119,6 +124,7 @@ export default function PlaylistEditorScreen({ route }: any) {
       .catch(() => {});
   }, [isOwner, token]);
 
+  // save the name when the input lose the focus (empty = on skip)
   function saveName() {
     if (!name.trim()) return;
     updatePlaylist(playlistId, token, { name: name.trim() }).catch(() =>
@@ -126,6 +132,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     );
   }
 
+  // optimistic public private switch (rollback if the api fail)
   function toggleVisibility() {
     const next = !isPublic;
     setIsPublic(next);
@@ -140,6 +147,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     const next: PlaylistLicenseMode = licenseMode === 'open' ? 'invite-only' : 'open';
     setLicenseMode(next);
     updatePlaylist(playlistId, token, { licenseMode: next }).catch(() => {
+      // rollback to the old value (licenseMode is still the old one in this closure)
       setLicenseMode(licenseMode);
       showToast({ type: 'error', message: 'Failed to update editing rights' });
     });
@@ -148,6 +156,7 @@ export default function PlaylistEditorScreen({ route }: any) {
   // deezer ne donne le bpm que via /track/{id}, pas dans les resultats de recherche ,
   // on le recupere avant l'ajout, comme ca le backend a directement la bonne valeur.
   async function pickTrack(dt: DeezerTrack) {
+    // bpm fail = null (we still add the track)
     const bpm = dt.bpm ?? (await getTrackBpm(dt.id).catch(() => null));
     const dto = {
       deezerId: dt.id,
@@ -171,6 +180,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     }
   }
 
+  // remove a track (socket if connected sinon rest)
   async function removeTrack(trackId: number) {
     if (connected) {
       removeTrackRealtime(playlistId, trackId);
@@ -184,8 +194,10 @@ export default function PlaylistEditorScreen({ route }: any) {
     }
   }
 
+  // move a track up or down by swapping with the neighbour (dir negative = up)
   function move(index: number, dir: -1 | 1) {
     const j = index + dir;
+    // already first or last = nothing to do
     if (j < 0 || j >= tracks.length) return;
     const copy = [...tracks];
     [copy[index], copy[j]] = [copy[j], copy[index]];
@@ -207,6 +219,7 @@ export default function PlaylistEditorScreen({ route }: any) {
       });
   }
 
+  // add or remove a friend as editor then reload the editors
   async function toggleCollaborator(friendId: number, isCollaborator: boolean) {
     try {
       if (isCollaborator) await removeCollaborator(playlistId, token, friendId);
@@ -217,6 +230,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     }
   }
 
+  // play the whole playlist from the first track
   function playAll() {
     if (tracks.length === 0) return;
     const queue = tracks.map(toPreviewTrack);
@@ -231,6 +245,7 @@ export default function PlaylistEditorScreen({ route }: any) {
     );
   }
 
+  // pause icon only when the first track is the one playing
   const wholePlaylistPlaying = tracks.length > 0 && activeTrack?.id === String(tracks[0].id) && isPlaying;
 
   return (
@@ -252,6 +267,7 @@ export default function PlaylistEditorScreen({ route }: any) {
             <Ionicons name="musical-note" size={64} color={colors.textPrimary} />
           </LinearGradient>
 
+          {/* owner can rename sinon just the name */}
           {isOwner ? (
             <TextInput
               style={styles.titleInput}
@@ -266,6 +282,7 @@ export default function PlaylistEditorScreen({ route }: any) {
             <Text style={styles.titleInput} numberOfLines={2}>{name}</Text>
           )}
 
+          {/* owner visibility license track count offline (owner can tap to toggle) */}
           <View style={styles.metaRow}>
             <Text style={styles.meta}>{isOwner ? 'You' : playlistState?.owner.username ?? 'Shared with you'}</Text>
             <Text style={styles.dot}>•</Text>
@@ -320,6 +337,7 @@ export default function PlaylistEditorScreen({ route }: any) {
             )}
           </View>
 
+          {/* big play button on the header edge */}
           <PressableCard
             style={[styles.playFab, tracks.length === 0 && styles.playFabOff]}
             hoverStyle={styles.playFabHover}
@@ -334,6 +352,7 @@ export default function PlaylistEditorScreen({ route }: any) {
 
       {/* Track list */}
       <View style={[styles.column, styles.body]}>
+        {/* one row per track (play up down remove) */}
         {tracks.map((tk, i) => {
           const isCurrent = activeTrack?.id === String(tk.id);
           return (
@@ -371,6 +390,7 @@ export default function PlaylistEditorScreen({ route }: any) {
           );
         })}
 
+        {/* empty playlist */}
         {tracks.length === 0 && (
           <EmptyState
             icon="disc-outline"
@@ -391,6 +411,7 @@ export default function PlaylistEditorScreen({ route }: any) {
             restrict it to the people below.
           </Text>
         )}
+        {/* owner = friends list to toggle editors sinon just the editor names */}
         {isOwner ? (
           friends.length === 0 ? (
             <Text style={styles.trackArtist}>Add friends to invite them as editors.</Text>
@@ -429,6 +450,7 @@ export default function PlaylistEditorScreen({ route }: any) {
   );
 }
 
+// cover size and play button size in px
 const COVER = 160;
 const FAB = 56;
 
@@ -457,6 +479,7 @@ const styles = StyleSheet.create({
   },
   visToggleHover: { backgroundColor: 'rgba(255,255,255,0.08)' },
   playFab: {
+    // negative bottom so half of the button go out of the header
     position: 'absolute', right: 0, bottom: -(FAB / 2 + spacing.xl),
     width: FAB, height: FAB, borderRadius: FAB / 2, backgroundColor: colors.accent,
     alignItems: 'center', justifyContent: 'center',

@@ -1,3 +1,4 @@
+// TL;DR e2e test (401 without token bad login bruteforce 429 unverified account 403)
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';

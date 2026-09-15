@@ -10,6 +10,7 @@ import {JwtStrategy} from "./strategies/jwt.strategy";
 import {MailModule} from "../mail/mail.module";
 import {GoogleStrategy} from "./strategies/google.strategy";
 
+// auth module (register login google jwt strategy)
 @Module({
   imports: [
     UsersModule,
@@ -21,6 +22,7 @@ import {GoogleStrategy} from "./strategies/google.strategy";
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
+        // the jwt stay valid 7 days
         signOptions: { expiresIn: '7d' },
       }),
     }),

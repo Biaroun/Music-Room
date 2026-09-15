@@ -20,6 +20,7 @@ export default function Field({ label, hint, error, containerStyle, style, ...in
       <TextInput
         placeholderTextColor={colors.textTertiary}
         {...inputProps}
+        // track the focus for the border and still call the parent handlers
         onFocus={(e) => { setFocused(true); inputProps.onFocus?.(e); }}
         onBlur={(e) => { setFocused(false); inputProps.onBlur?.(e); }}
         style={[
@@ -30,6 +31,7 @@ export default function Field({ label, hint, error, containerStyle, style, ...in
           style,
         ]}
       />
+      {/* error wins over the hint */}
       {(error || hint) && (
         <Text style={[styles.hint, !!error && styles.errorText]}>{error || hint}</Text>
       )}

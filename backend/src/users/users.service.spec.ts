@@ -1,3 +1,4 @@
+// TL;DR test users service (avatar empty tokens reset token username cleanup google attach)
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';

@@ -8,6 +8,7 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 
+// body for the reset password (token + new password)
 export class ResetPasswordDto {
     @ApiProperty({ description: 'Token received in the reset email' })
     @IsString()
@@ -21,6 +22,7 @@ export class ResetPasswordDto {
     @IsString()
     @MinLength(12, { message: 'Le mot de passe doit contenir au moins 12 caractères.' })
     @MaxLength(255, { message: 'Le mot de passe est trop long.' })
+    // lookaheads = at least 1 lower 1 upper 1 digit 1 special char
     @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, {
         message: 'Le mot de passe doit contenir majuscule, minuscule, chiffre et caractère spécial',
     })

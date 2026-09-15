@@ -11,6 +11,7 @@ import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import { type ApiPlaylist, listMyPlaylists, createPlaylist, deletePlaylist } from '../lib/playlists';
 
+// list of my playlists (owned + shared) with create and delete
 export default function PlaylistsScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -22,6 +23,7 @@ export default function PlaylistsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
+  // reload the list each time we come back on the screen
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -33,6 +35,7 @@ export default function PlaylistsScreen({ navigation }: any) {
     }, [token])
   );
 
+  // create an empty playlist and open the editor right away
   async function handleCreate() {
     setCreating(true);
     try {
@@ -45,6 +48,7 @@ export default function PlaylistsScreen({ navigation }: any) {
     }
   }
 
+  // delete a playlist and remove it from the list
   async function handleDelete(id: number) {
     try {
       await deletePlaylist(id, token);
@@ -66,11 +70,13 @@ export default function PlaylistsScreen({ navigation }: any) {
   return (
     <Screen scroll={false} padded={false} wide>
       <FlatList
+        // key = columns so the FlatList remount when the columns change (numColumns cant change live)
         key={columns}
         data={playlists}
         numColumns={columns}
         columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
         keyExtractor={(p) => String(p.id)}
+        // +88 so the last row is not under the floating button
         contentContainerStyle={[styles.list, { paddingBottom: bottomInset + 88 }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
@@ -89,6 +95,7 @@ export default function PlaylistsScreen({ navigation }: any) {
             onAction={handleCreate}
           />
         }
+        // one row per playlist (icon name visibility count shared badge delete)
         renderItem={({ item }) => (
           <PressableCard
             style={[styles.row, columns > 1 && styles.rowGrid]}
@@ -132,6 +139,7 @@ export default function PlaylistsScreen({ navigation }: any) {
         )}
       />
 
+      {/* floating new playlist button (the empty state has its own button) */}
       {playlists.length > 0 && (
         <View style={[styles.fabWrap, { bottom: bottomInset + spacing.md }]}>
           <Button

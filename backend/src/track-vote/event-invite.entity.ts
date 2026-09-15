@@ -14,6 +14,7 @@ export class EventInvite {
     @JoinColumn()
     event: Event;
 
+    // the invited user
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     @JoinColumn()
     invitee: User;

@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import { useToast } from '../components/Toast';
 import type { AddTrackInput, PlaylistState } from '../lib/playlists';
 
+// what a friend is listening (pushed by the server)
 export type FriendListening = {
     userId: number;
     username: string;
@@ -17,6 +18,7 @@ export type FriendListening = {
     startedAt: number;
 };
 
+// what I send about my current track
 export type ListeningReport = {
     deezerId: string;
     title: string;
@@ -24,6 +26,7 @@ export type ListeningReport = {
     cover?: string;
 };
 
+// one line of the vote board
 export type VoteBoardTrack = {
     trackId: number;
     deezerId: string;
@@ -34,6 +37,7 @@ export type VoteBoardTrack = {
     myVote: boolean;
 };
 
+// track playing now in the event
 export type VoteNowPlaying = {
     trackId: number;
     deezerId: string;
@@ -45,6 +49,7 @@ export type VoteNowPlaying = {
     durationMs: number;
 };
 
+// the board pushed on vote board
 export type VoteBoard = {
     tracks: VoteBoardTrack[];
     nowPlaying: VoteNowPlaying | null;
@@ -87,6 +92,7 @@ const HEARTBEAT_MS = 45_000;
 // utilise seulement quand le websocket ne passe pas.
 const FALLBACK_POLL_MS = 20_000;
 
+// one socket for the whole app (listening votes playlist edit) + rest fallback
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const { token } = useAuth();
     const { showToast } = useToast();
@@ -103,10 +109,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // l'etat apres une reconnexion
     const lastReportRef = useRef<ListeningReport | null>(null);
 
+    // list to an object by userId (easy update and delete)
     function indexByUser(list: FriendListening[]): Record<number, FriendListening> {
         return Object.fromEntries(list.map((l) => [l.userId, l]));
     }
 
+    // open the socket when we have a token and plug all the listeners
     useEffect(() => {
         if (!token) {
             setFriendsListening({});
@@ -139,6 +147,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         socket.on('disconnect', () => setConnected(false));
         socket.on('connect_error', () => setConnected(false));
 
+        // full list at connect then changed or stopped one by one
         socket.on('listening:snapshot', (list: FriendListening[]) => {
             setFriendsListening(indexByUser(list ?? []));
         });
@@ -172,6 +181,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             showToast({ type: 'error', message: message || 'Someone else reordered this playlist' });
         });
 
+        // nettoyer remove the listeners and close the socket (No leaks)
         return () => {
             socket.removeAllListeners();
             socket.disconnect();
@@ -180,17 +190,20 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         };
     }, [token]);
 
+    // join the vote room (board reset until the snapshot comes)
     const joinEvent = useCallback((eventId: number) => {
         joinedEventIdRef.current = eventId;
         setVoteBoard(undefined);
         socketRef.current?.emit('event:join', { eventId });
     }, []);
 
+    // leave the vote room (dont rejoin on reconnect)
     const leaveEvent = useCallback((eventId: number) => {
         if (joinedEventIdRef.current === eventId) joinedEventIdRef.current = null;
         socketRef.current?.emit('event:leave', { eventId });
     }, []);
 
+    // send a vote on the socket (position spread if given)
     const castVoteRealtime = useCallback(
         (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => {
             socketRef.current?.emit('vote:cast', { eventId, trackId, ...position });
@@ -198,6 +211,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         [],
     );
 
+    // remove a vote on the socket
     const retractVoteRealtime = useCallback(
         (eventId: number, trackId: number, position?: { latitude: number; longitude: number }) => {
             socketRef.current?.emit('vote:retract', { eventId, trackId, ...position });
@@ -205,29 +219,35 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         [],
     );
 
+    // join the playlist room (state reset until the snapshot comes)
     const joinPlaylist = useCallback((playlistId: number) => {
         joinedPlaylistIdRef.current = playlistId;
         setPlaylistState(undefined);
         socketRef.current?.emit('playlist:join', { playlistId });
     }, []);
 
+    // leave the playlist room
     const leavePlaylist = useCallback((playlistId: number) => {
         if (joinedPlaylistIdRef.current === playlistId) joinedPlaylistIdRef.current = null;
         socketRef.current?.emit('playlist:leave', { playlistId });
     }, []);
 
+    // add a track on the socket
     const addTrackRealtime = useCallback((playlistId: number, dto: AddTrackInput) => {
         socketRef.current?.emit('playlist:track:add', { playlistId, ...dto });
     }, []);
 
+    // remove a track on the socket
     const removeTrackRealtime = useCallback((playlistId: number, trackId: number) => {
         socketRef.current?.emit('playlist:track:remove', { playlistId, trackId });
     }, []);
 
+    // send the new order with the version I saw
     const reorderRealtime = useCallback((playlistId: number, trackIds: number[], version: number) => {
         socketRef.current?.emit('playlist:reorder', { playlistId, trackIds, version });
     }, []);
 
+    // say what I listen (socket if connected sinon rest)
     const reportListening = useCallback(
         (track: ListeningReport | null) => {
             lastReportRef.current = track;
@@ -261,6 +281,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     // repli : tant que le websocket ne passe pas, on interroge le REST.
     useEffect(() => {
         if (!token || connected) return;
+        // active false after cleanup so a late answer dont set the state
         let active = true;
         const load = () => {
             apiFetch('/listening/friends', token)
@@ -296,6 +317,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
+// hook to use the realtime context (crash if outside the provider)
 export function useRealtime() {
     const ctx = useContext(RealtimeContext);
     if (!ctx) throw new Error('useRealtime must be used inside RealtimeProvider');

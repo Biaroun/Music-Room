@@ -8,6 +8,7 @@ const DEFAULT_URL = Platform.OS === 'web' ? 'http://localhost:3000' : 'http://10
 // sujet v.5 : l'adresse du back doit se regler dans l'app. le .env donne la
 // valeur du build, l'ecran Server (depuis le login) la surcharge sur l'appareil
 export const BUILD_API_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_URL;
+// storage key for the custom url
 const API_URL_KEY = 'api_url';
 
 let apiUrl = BUILD_API_URL;
@@ -33,6 +34,7 @@ export async function setApiUrl(url: string | null) {
   apiUrl = url || BUILD_API_URL;
 }
 
+// trim + remove the last slashes then check its http or https + host + optional port (sinon null)
 export function normalizeApiUrl(input: string): string | null {
   const url = input.trim().replace(/\/+$/, '');
   return /^https?:\/\/[^\s/]+(:\d+)?$/i.test(url) ? url : null;
@@ -42,6 +44,7 @@ export function normalizeApiUrl(input: string): string | null {
 // service qui ecoute sur le meme port
 export async function probeApiUrl(url: string): Promise<boolean> {
   const ctrl = new AbortController();
+  // give up after 5s
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
     const res = await fetch(`${url}/api/docs-json`, { signal: ctrl.signal });
@@ -54,6 +57,7 @@ export async function probeApiUrl(url: string): Promise<boolean> {
   }
 }
 
+// fetch on the api with json + device headers + token (throw with the status if not ok)
 export async function apiFetch(path: string, token: string | null, options: RequestInit = {}) {
   const res = await fetch(`${apiUrl}${path}`, {
     ...options,
@@ -65,8 +69,10 @@ export async function apiFetch(path: string, token: string | null, options: Requ
       ...(options.headers ?? {}),
     },
   });
+  // empty body (204) = {} instead of a crash
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // validation errors come as an array so one per line
     const msg = Array.isArray(data.message) ? data.message.join('\n') : data.message;
     // le statut permet a l'appelant de distinguer un 401 d'une panne reseau
     throw Object.assign(new Error(msg || 'Request failed'), { status: res.status });

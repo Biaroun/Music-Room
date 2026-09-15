@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { subscribe, cancelSubscription, type SubscriptionPlan } from '../lib/subscription';
 import GoogleLinkCard from '../components/GoogleLinkCard';
 
+// what this screen need from GET users me
 type Me = {
   id: number;
   username: string;
@@ -24,8 +25,10 @@ type Me = {
   hasPassword: boolean;
 };
 
+// same rule as the backend (1 lower 1 upper 1 digit 1 special and min 12)
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{12,}$/;
 
+// account settings (google link email password premium logout)
 export default function SettingsScreen({ navigation }: any) {
   const { token, logout, refreshAccount } = useAuth();
   const { showToast } = useToast();
@@ -34,6 +37,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPwd, setSavingPwd] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
+  // which confirm dialog is open (null = none)
   const [confirmAction, setConfirmAction] = useState<'subscribe' | 'cancel' | null>(null);
 
   const [newemail, setNewemail] = useState('');
@@ -42,6 +46,7 @@ export default function SettingsScreen({ navigation }: any) {
   const [newPwd, setNewPwd] = useState('');
   const [newPwdConfirm, setNewPwdConfirm] = useState('');
 
+  // load my account (also called again after a google link change)
   async function loadMe() {
     try { setMe(await apiFetch('/users/me', token)); }
     catch (e: any) { showToast({ type: 'error', message: e.message }); }
@@ -49,6 +54,7 @@ export default function SettingsScreen({ navigation }: any) {
   }
   useEffect(() => { loadMe(); }, []);
 
+  // change the email with the current password
   async function changeEmail() {
     if (!newemail || !emailPwd) return;
     setSavingEmail(true);
@@ -65,6 +71,7 @@ export default function SettingsScreen({ navigation }: any) {
     finally { setSavingEmail(false); }
   }
 
+  // change the password (only if the form is valid)
   async function changePassword() {
     if (!pwdFormValid) return;
     setSavingPwd(true);
@@ -79,6 +86,7 @@ export default function SettingsScreen({ navigation }: any) {
     finally { setSavingPwd(false); }
   }
 
+  // run the subscribe or cancel the user just confirmed
   async function confirmSubscriptionChange() {
     const action = confirmAction;
     setConfirmAction(null);
@@ -115,6 +123,7 @@ export default function SettingsScreen({ navigation }: any) {
 
   return (
     <Screen>
+      {/* account card (first letter name email verified badge) */}
       <View style={styles.account}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{me?.username?.[0]?.toUpperCase() ?? '?'}</Text>
@@ -135,9 +144,11 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
       </View>
 
+      {/* google link */}
       <Text style={[typography.h2, ui.section]}>Linked accounts</Text>
       <GoogleLinkCard googleEmail={me?.googleEmail ?? null} hasPassword={!!me?.hasPassword} onChange={loadMe} />
 
+      {/* change email form */}
       <Text style={[typography.h2, ui.section]}>Change email</Text>
       <View style={ui.card}>
         <Field
@@ -164,6 +175,7 @@ export default function SettingsScreen({ navigation }: any) {
         />
       </View>
 
+      {/* change password form (errors shown while typing) */}
       <Text style={[typography.h2, ui.section]}>Change password</Text>
       <View style={ui.card}>
         <Field label="Current password" placeholder="••••••••" value={curPwd} onChangeText={setCurPwd} secureTextEntry />
@@ -193,6 +205,7 @@ export default function SettingsScreen({ navigation }: any) {
         />
       </View>
 
+      {/* plan badge + subscribe or cancel button */}
       <Text style={[typography.h2, ui.section]}>Subscription</Text>
       <View style={ui.card}>
         <View style={styles.planRow}>
@@ -232,10 +245,12 @@ export default function SettingsScreen({ navigation }: any) {
         )}
       </View>
 
+      {/* back and logout */}
       <Text style={[typography.h2, ui.section]}>Session</Text>
       <Button title="Back to Home" icon="arrow-back" variant="secondary" onPress={() => navigation.goBack()} />
       <Button title="Log out" icon="log-out-outline" variant="danger" onPress={logout} style={{ marginTop: spacing.sm }} />
 
+      {/* confirm dialog for subscribe or cancel */}
       <ConfirmDialog
         visible={confirmAction != null}
         title={confirmAction === 'subscribe' ? 'Subscribe to Premium?' : 'Cancel your subscription?'}

@@ -7,6 +7,7 @@ export type ClientContext = {
     appVersion: string | null;
 };
 
+// when there is no headers at all
 export const EMPTY_CLIENT_CONTEXT: ClientContext = { platform: null, device: null, appVersion: null };
 
 // noms poses par mobile/src/config/device.ts : renommer d'un seul cote vide
@@ -19,6 +20,7 @@ export const APP_VERSION_HEADER = 'x-client-app-version';
 // on tronque aussi, rien n'empeche un client de poster 10 ko de nom d'appareil
 const MAX_LENGTH = 120;
 
+// take the first value trim it and cut at MAX_LENGTH (null if empty)
 function clean(value: unknown): string | null {
     const raw = Array.isArray(value) ? value[0] : value;
     if (typeof raw !== 'string') return null;
@@ -27,6 +29,7 @@ function clean(value: unknown): string | null {
     return trimmed.slice(0, MAX_LENGTH);
 }
 
+// read the 3 client headers of an http request
 export function clientContextFromHeaders(headers: Record<string, unknown> | undefined): ClientContext {
     if (!headers) return EMPTY_CLIENT_CONTEXT;
     return {

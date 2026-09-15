@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { execFileSync } = require('child_process');
+const { markEmailVerified } = require('./lib/mark-email-verified');
 
 const API_URL = process.env.API_URL || 'http://localhost:3000';
 const CREDENTIALS_FILE = path.join(__dirname, '..', 'backend', '.env.seed-users');
@@ -36,7 +36,10 @@ function generatePassword() {
   return chars.join('');
 }
 
-async function apiRequest(pathName, { method = 'GET', token = null, body = null } = {}) {
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function apiRequest(pathName, options = {}, attempt = 0) {
+  const { method = 'GET', token = null, body = null } = options;
   let res;
   try {
     res = await fetch(`${API_URL}${pathName}`, {
@@ -55,44 +58,91 @@ async function apiRequest(pathName, { method = 'GET', token = null, body = null 
   }
 
   const data = await res.json().catch(() => ({}));
+  // login et register sont plafonnes a 5 essais par minute, on attend plutot que d'echouer
+  if (res.status === 429 && attempt < 3) {
+    console.log('   limite anti-bruteforce atteinte, attente 60s...');
+    await sleep(60_000);
+    return apiRequest(pathName, options, attempt + 1);
+  }
   if (!res.ok) {
     const msg = Array.isArray(data.message) ? data.message.join(', ') : data.message;
-    throw new Error(`${method} ${pathName} -> ${res.status}: ${msg || 'echec inconnu'}`);
+    const err = new Error(`${method} ${pathName} -> ${res.status}: ${msg || 'echec inconnu'}`);
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
 
-// pas de vraie boite mail, on valide le compte direct en base
-function markEmailVerified(email) {
-  execFileSync(
-    'docker',
-    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'musicroom',
-      '-v', 'ON_ERROR_STOP=1', '-v', `email=${email}`],
-    {
-      cwd: path.join(__dirname, '..'),
-      input: `UPDATE "user" SET "emailisVerified" = true WHERE email = :'email';`,
-      stdio: ['pipe', 'ignore', 'inherit'],
-    }
-  );
+// relit les mots de passe d'un seed precedent pour pouvoir relancer le script
+function readKnownPasswords() {
+  if (!fs.existsSync(CREDENTIALS_FILE)) return {};
+  const passwords = {};
+  let current = null;
+  for (const line of fs.readFileSync(CREDENTIALS_FILE, 'utf8').split('\n')) {
+    if (/^[^\s#]/.test(line)) current = line.trim();
+    const match = line.match(/^\s+password:\s+(\S+)/);
+    if (match && current) passwords[current] = match[1];
+  }
+  return passwords;
 }
 
-async function createUser(spec) {
+async function loginOrRegister(spec, knownPassword) {
+  if (knownPassword) {
+    try {
+      const { access_token: token } = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: { login: spec.email, password: knownPassword },
+      });
+      return { password: knownPassword, token, created: false };
+    } catch (err) {
+      if (err.status !== 401) throw err;
+      // compte absent ou mot de passe change, on retombe sur la creation
+    }
+  }
+
   const password = generatePassword();
-  const { access_token: token } = await apiRequest('/auth/register', {
-    method: 'POST',
-    body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
-  });
+  try {
+    const { access_token: token } = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: { username: spec.username, email: spec.email, password, passwordConfirm: password },
+    });
+    return { password, token, created: true };
+  } catch (err) {
+    if (err.status === 409) {
+      throw new Error(
+        `${spec.username} existe deja en base mais son mot de passe n'est pas dans ${CREDENTIALS_FILE}. ` +
+        `Supprime ce user en base (ou remets le bon fichier) puis relance.`
+      );
+    }
+    throw err;
+  }
+}
+
+async function seedUser(spec, knownPassword) {
+  const { password, token, created } = await loginOrRegister(spec, knownPassword);
   markEmailVerified(spec.email);
 
   const me = await apiRequest('/users/me', { token });
   await apiRequest('/users/me', { method: 'PATCH', token, body: { avatar: spec.avatar } });
 
-  return { ...spec, password, id: me.id, token };
+  return { ...spec, password, id: me.id, token, created };
 }
 
 async function befriend(a, b) {
-  const request = await apiRequest(`/friendship/request/${b.id}`, { method: 'POST', token: a.token });
-  await apiRequest(`/friendship/${request.id}/accept`, { method: 'PATCH', token: b.token });
+  const friends = await apiRequest('/friendship/friends', { token: a.token });
+  if (friends.some((f) => f.friendId === b.id)) return false;
+
+  let request = null;
+  try {
+    request = await apiRequest(`/friendship/request/${b.id}`, { method: 'POST', token: a.token });
+  } catch (err) {
+    if (err.status !== 409) throw err;
+  }
+  if (request?.status === 'accepted') return true;
+
+  // la demande de b vers a accepte celle en attente de a vers b
+  await apiRequest(`/friendship/request/${a.id}`, { method: 'POST', token: b.token });
+  return true;
 }
 
 function writeCredentialsFile(users) {
@@ -105,35 +155,40 @@ function writeCredentialsFile(users) {
   fs.writeFileSync(CREDENTIALS_FILE, header + body + '\n', { mode: 0o600 });
 }
 
-async function main() {
-  if (fs.existsSync(CREDENTIALS_FILE)) {
-    console.error(`${CREDENTIALS_FILE} existe deja : ces users semblent deja seedes.`);
-    console.error('Supprime ce fichier et les users correspondants en base pour reseeder.');
-    process.exit(1);
-  }
+// reecrit apres chaque user pour ne jamais perdre un mot de passe si ca plante en route
+function saveCredentials(seeded, knownPasswords) {
+  const users = USERS
+    .map((spec) => seeded.find((u) => u.username === spec.username)
+      || (knownPasswords[spec.username] && { ...spec, password: knownPasswords[spec.username] }))
+    .filter(Boolean);
+  writeCredentialsFile(users);
+}
 
-  const created = [];
+async function main() {
+  const knownPasswords = readKnownPasswords();
+
+  const seeded = [];
   for (const spec of USERS) {
-    console.log(`-> creation de ${spec.username}...`);
     try {
-      created.push(await createUser(spec));
+      const user = await seedUser(spec, knownPasswords[spec.username]);
+      console.log(`-> ${spec.username} ${user.created ? 'cree' : 'deja present, mis a jour'}`);
+      seeded.push(user);
+      saveCredentials(seeded, knownPasswords);
     } catch (err) {
       console.error(`echec sur ${spec.username}: ${err.message}`);
-      if (created.length) {
-        console.error(`users deja crees avant l'echec: ${created.map((u) => u.username).join(', ')}`);
-        console.error("pas de suppression automatique (aucun endpoint DELETE user) - nettoyage manuel en base si besoin.");
-      }
       process.exit(1);
     }
   }
 
   for (const [i, j] of PAIRS) {
-    console.log(`-> amitie ${created[i].username} <-> ${created[j].username}...`);
-    await befriend(created[i], created[j]);
+    const done = await befriend(seeded[i], seeded[j]);
+    console.log(`-> amitie ${seeded[i].username} <-> ${seeded[j].username} ${done ? 'creee' : 'deja en place'}`);
   }
 
-  writeCredentialsFile(created);
-  console.log(`OK: 3 users crees et amis entre eux. Identifiants dans ${CREDENTIALS_FILE}`);
+  console.log(`OK: ${seeded.length} users prets et amis entre eux. Identifiants dans ${CREDENTIALS_FILE}`);
 }
 
-main();
+main().catch((err) => {
+  console.error(`Echec: ${err.message}`);
+  process.exit(1);
+});

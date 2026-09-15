@@ -1,3 +1,4 @@
+// TL;DR test the friendship controller mapping (friends sent requests cancel blocks)
 import { Test, TestingModule } from '@nestjs/testing';
 import { FriendshipController } from './friendship.controller';
 import { FriendshipService } from './friendship.service';

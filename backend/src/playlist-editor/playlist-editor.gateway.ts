@@ -16,8 +16,10 @@ import { LogsInterceptor } from '../logs/logs.interceptor';
 import { PlaylistEditorService } from './playlist-editor.service';
 import { AddTrackDto } from './dto/add-track.dto';
 
+// socket with the user set after auth
 type AuthedSocket = Socket & { data: { userId: number; username: string } };
 
+// room name of a playlist
 export function playlistRoomOf(playlistId: number): string {
     return `playlist:${playlistId}`;
 }
@@ -45,6 +47,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         @Inject(CACHE_MANAGER) private cache: Cache,
     ) {}
 
+    // kick the socket if the token is bad
     async handleConnection(client: AuthedSocket) {
         if (!(await this.authenticate(client))) client.disconnect(true);
     }
@@ -81,6 +84,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         return this.authenticate(client);
     }
 
+    // join the playlist room if I can view it
     @SubscribeMessage('playlist:join')
     async onJoin(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { playlistId: number }) {
         const userId = await this.resolveUserId(client);
@@ -96,11 +100,13 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         client.emit('playlist:state', await this.playlists.getState(dto.playlistId));
     }
 
+    // leave the playlist room
     @SubscribeMessage('playlist:leave')
     async onLeave(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { playlistId: number }) {
         await client.leave(playlistRoomOf(dto.playlistId));
     }
 
+    // add a track then send the new state to the room
     @SubscribeMessage('playlist:track:add')
     async onAddTrack(
         @ConnectedSocket() client: AuthedSocket,
@@ -119,6 +125,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         await this.broadcastState(playlistId);
     }
 
+    // remove a track then send the new state to the room
     @SubscribeMessage('playlist:track:remove')
     async onRemoveTrack(
         @ConnectedSocket() client: AuthedSocket,
@@ -135,6 +142,7 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         await this.broadcastState(dto.playlistId);
     }
 
+    // reorder the tracks (conflict = on renvoie the fresh state only to the sender)
     @SubscribeMessage('playlist:reorder')
     async onReorder(
         @ConnectedSocket() client: AuthedSocket,
@@ -171,10 +179,12 @@ export class PlaylistEditorGateway implements OnGatewayConnection {
         this.server.to(playlistRoomOf(playlistId)).emit('playlist:state', state);
     }
 
+    // token from handshake auth sinon from the Bearer header
     private extractToken(client: Socket): string | null {
         const fromAuth = client.handshake.auth?.token;
         if (typeof fromAuth === 'string' && fromAuth) return fromAuth;
         const header = client.handshake.headers?.authorization;
+        // 7 = length of Bearer + the space
         if (typeof header === 'string' && header.startsWith('Bearer ')) return header.slice(7);
         return null;
     }

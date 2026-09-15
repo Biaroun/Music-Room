@@ -9,6 +9,7 @@ import {
 import { Match } from '../../auth/decorators/match.decorator';
 import { ApiProperty } from '@nestjs/swagger';
 
+// body to change the password (current + new + confirm)
 export class UpdatePasswordDto {
     @ApiProperty({
         example: 'Test1234!@#$',
@@ -28,6 +29,7 @@ export class UpdatePasswordDto {
     @MinLength(12, {
         message: 'Le mot de passe doit contenir au moins 12 caractères.',
     })
+    // lookaheads = at least 1 lower 1 upper 1 digit 1 special char
     @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, {
         message:
             'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',

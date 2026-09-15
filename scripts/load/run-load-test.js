@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 
+// users + tokens made by seed load users
 const POOL_FILE = path.join(__dirname, 'load-users.json');
 
 const DEFAULTS = {
@@ -30,6 +31,7 @@ const DEFAULTS = {
 // seuils au-dela desquels on considere le palier comme non tenu
 const THRESHOLDS = { errorRate: 0.01, p95: 400, p99: 1000 };
 
+// read the flags as pairs (flag then value) over the defaults
 function parseArgs(argv) {
     const args = { ...DEFAULTS };
     for (let i = 0; i < argv.length; i += 2) {
@@ -43,8 +45,10 @@ function parseArgs(argv) {
     return args;
 }
 
+// promise sleep
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// value at percentile p in a sorted list (ceil minus 1 = index start at 0)
 function percentile(sorted, p) {
     if (!sorted.length) return 0;
     const index = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
@@ -74,9 +78,11 @@ async function iteration(api, user, record) {
     ];
 
     for (const route of routes) {
+        // hrtime in nanoseconds (more precise than Date now)
         const start = process.hrtime.bigint();
         try {
             const res = await fetch(`${api}${route}`, { headers });
+            // ns to ms
             const ms = Number(process.hrtime.bigint() - start) / 1e6;
             record(res.ok, ms, res.status);
         } catch {
@@ -86,12 +92,14 @@ async function iteration(api, user, record) {
     }
 }
 
+// run vus fake users in parallel for durationMs and give the stats of the step
 async function runStep(api, pool, vus, durationMs, thinkMs) {
     const latencies = [];
     let ok = 0;
     let ko = 0;
     const statuses = new Map();
 
+    // save the latency and count ok ko (ko grouped by status)
     const record = (success, ms, status) => {
         latencies.push(ms);
         if (success) ok++;
@@ -134,10 +142,12 @@ async function runStep(api, pool, vus, durationMs, thinkMs) {
     };
 }
 
+// true if the step respect the 3 thresholds
 function holds(r) {
     return r.errorRate <= THRESHOLDS.errorRate && r.p95 <= THRESHOLDS.p95 && r.p99 <= THRESHOLDS.p99;
 }
 
+// one line of the result table
 function row(r) {
     const cells = [
         String(r.vus).padStart(4),
@@ -152,6 +162,7 @@ function row(r) {
     return cells.join(' |');
 }
 
+// 1) read args and pool 2) run each step 3) print the table 4) exit 0 if at least 1 step holds
 async function main() {
     const args = parseArgs(process.argv.slice(2));
 
@@ -181,6 +192,7 @@ async function main() {
         await sleep(2000);
     }
 
+    // reverse = the biggest step that still holds
     const lastHolding = [...results].reverse().find(holds);
     console.log('');
     if (lastHolding) {

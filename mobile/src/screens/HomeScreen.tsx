@@ -11,6 +11,7 @@ import TrackSearch from '../components/TrackSearch';
 import Screen from '../components/Screen';
 import PressableCard from '../components/PressableCard';
 
+// one tile of the quick access grid
 type Shortcut = {
   title: string;
   subtitle: string;
@@ -19,6 +20,7 @@ type Shortcut = {
   color: string;
 };
 
+// the tiles of the home grid
 const SHORTCUTS: Shortcut[] = [
   { title: 'Playlists', subtitle: 'Your mixes', icon: 'musical-notes', screen: 'Playlists', color: '#1DB954' },
   { title: 'Friends', subtitle: 'Your circle', icon: 'people', screen: 'Friends', color: '#22d3ee' },
@@ -30,16 +32,11 @@ const SHORTCUTS: Shortcut[] = [
 // la couleur sert de teinte de fond, pas d'aplat : 6 carres satures
 // ecrasent le reste de la page
 function tint(hex: string) {
+  // 24 hex = about 14 percent alpha at the end of the color
   return `${hex}24`;
 }
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Salam Aleykoum';
-  return 'Good evening';
-}
-
+// home screen (hello search quick access last playlist)
 export default function HomeScreen({ navigation }: any) {
   const { token } = useAuth();
   const [username, setUsername] = useState<string | null>(null);
@@ -49,6 +46,7 @@ export default function HomeScreen({ navigation }: any) {
   // 3 colonnes des qu'on a la place (web / tablette), 2 sur telephone
   const columns = width >= layout.wideBreakpoint ? 3 : 2;
 
+  // reload my name and my last playlist each time the screen get the focus
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -63,6 +61,7 @@ export default function HomeScreen({ navigation }: any) {
           setLoadedPlaylists(true);
         })
         .catch(() => { if (active) setLoadedPlaylists(true); });
+      // active false = on ignore the answers after we leave the screen
       return () => { active = false; };
     }, [token])
   );
@@ -71,11 +70,13 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <Screen>
-      <Text style={styles.greeting}>{greeting()}{username ? `, ${username}` : ''}</Text>
+      {/* hello + deezer search */}
+      <Text style={styles.greeting}>Bienvenue{username ? `, ${username}` : ''}</Text>
       <Text style={styles.greetingSub}>What are we listening to today?</Text>
 
       <TrackSearch placeholder="Search music…" />
 
+      {/* quick access grid (3 columns on wide screens 2 on phone) */}
       <Text style={[typography.h2, ui.section]}>Quick access</Text>
       <View style={styles.grid}>
         {SHORTCUTS.map((s) => (
@@ -96,6 +97,7 @@ export default function HomeScreen({ navigation }: any) {
         ))}
       </View>
 
+      {/* last playlist card or create the first one */}
       {loadedPlaylists && (
         <>
           <Text style={[typography.h2, ui.section]}>{latest ? 'Pick up where you left off' : 'Start here'}</Text>

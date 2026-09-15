@@ -9,6 +9,7 @@ export enum PlaylistLicenseMode {
     INVITE_ONLY = 'invite-only',
 }
 
+// a playlist (owner tracks visibility and license)
 @Entity()
 export class Playlist {
     @PrimaryGeneratedColumn()
@@ -17,6 +18,7 @@ export class Playlist {
     @Column()
     name: string;
 
+    // public = everybody can see it (edit depend on licenseMode)
     @Column({ default: true })
     isPublic: boolean;
 
@@ -28,6 +30,7 @@ export class Playlist {
     @Column({ type: 'int', default: 0 })
     version: number;
 
+    // owner deleted = playlist deleted too
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     @JoinColumn()
     owner: User;

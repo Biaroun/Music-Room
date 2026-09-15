@@ -18,8 +18,10 @@ import { LogsInterceptor } from '../logs/logs.interceptor';
 import { ListeningService } from './listening.service';
 import { UpdateListeningDto } from './dto/update-listening.dto';
 
+// socket with the user set after auth
 type AuthedSocket = Socket & { data: { userId: number; username: string } };
 
+// one room per user (all the user devices join it)
 function roomOf(userId: number): string {
     return `user:${userId}`;
 }
@@ -48,6 +50,7 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         @Inject(CACHE_MANAGER) private cache: Cache,
     ) {}
 
+    // on connect auth the token join the user room and send the snapshot
     async handleConnection(client: AuthedSocket) {
         const userId = await this.authenticate(client);
         if (!userId) return client.disconnect(true);
@@ -89,6 +92,7 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         return this.authenticate(client);
     }
 
+    // on disconnect clear the listening if it was the last device
     async handleDisconnect(client: AuthedSocket) {
         const userId = client.data?.userId;
         if (!userId) return;
@@ -102,6 +106,7 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.broadcastStopped(userId);
     }
 
+    // save the track and push it to all the friends rooms
     @SubscribeMessage('listening:update')
     async onUpdate(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: UpdateListeningDto) {
         const userId = await this.resolveUserId(client);
@@ -119,6 +124,7 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         }
     }
 
+    // the user stopped (clear + tell the friends)
     @SubscribeMessage('listening:stop')
     async onStop(@ConnectedSocket() client: AuthedSocket) {
         const userId = await this.resolveUserId(client);
@@ -127,6 +133,7 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.broadcastStopped(userId);
     }
 
+    // tell every friend that userId stopped listening
     private async broadcastStopped(userId: number) {
         const { friendIds } = await this.listening.getAudience(userId);
         for (const friendId of friendIds) {
@@ -134,10 +141,12 @@ export class ListeningGateway implements OnGatewayConnection, OnGatewayDisconnec
         }
     }
 
+    // token from handshake auth sinon from the Bearer header
     private extractToken(client: Socket): string | null {
         const fromAuth = client.handshake.auth?.token;
         if (typeof fromAuth === 'string' && fromAuth) return fromAuth;
         const header = client.handshake.headers?.authorization;
+        // 7 = length of Bearer + the space
         if (typeof header === 'string' && header.startsWith('Bearer ')) return header.slice(7);
         return null;
     }

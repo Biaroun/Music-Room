@@ -27,6 +27,7 @@ import VerifyEmailScreen from './src/screens/VerifyEmailScreen';
 import ServerSettingsScreen from './src/screens/ServerSettingsScreen';
 
 
+// the stack navigator for all the screens
 const Stack = createNativeStackNavigator();
 
 // Thème navigation aligné sur nos tokens : sans ça le fond par défaut (blanc) flashe
@@ -52,8 +53,10 @@ function releaseFocusOnNavigate() {
   if (active instanceof HTMLElement) active.blur();
 }
 
+// choose the screens depending on the auth state (verify email app or login)
 function Navigation() {
   const { isAuthenticated, isLoading, account } = useAuth();
+  // logged but mail not verified = only the verify screen
   const mustVerifyEmail = isAuthenticated && account !== null && !account.emailisVerified;
   if (isLoading) {
     return (
@@ -74,10 +77,12 @@ function Navigation() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
+      {/* 3 cases verify email screen OR the app OR the login screens */}
       {mustVerifyEmail ? (
         <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} options={{ headerShown: false }} />
       ) : isAuthenticated ? (
         <>
+          {/* logged in screens */}
           <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Music Room' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
@@ -90,6 +95,7 @@ function Navigation() {
         </>
       ) : (
         <>
+          {/* not logged screens */}
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create an account' }} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Mot de passe oublié' }} />
@@ -100,6 +106,7 @@ function Navigation() {
   );
 }
 
+// root of the app (all the providers then the navigation + mini player)
 export default function App() {
   return (
     <SafeAreaProvider>

@@ -28,6 +28,7 @@ import {ConfigService} from "@nestjs/config";
 import {ThrottleAuth} from "./auth-throttle";
 import {AllowUnverified} from "./decorators/allow-unverified.decorator";
 
+// all the /auth routes
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -37,6 +38,7 @@ export class AuthController {
                 private usersService: UsersService,
                 private config: ConfigService) {}
 
+    // POST /auth/register create an account
     @ApiOperation({ summary: 'Register a new user' })
     @ApiResponse({ status: 201, description: 'User registered successfully' })
     @ApiResponse({ status: 409, description: 'Email or username already exists' })
@@ -46,6 +48,7 @@ export class AuthController {
         return await this.authService.register(dto);
     }
 
+    // POST /auth/login return a jwt
     @ApiOperation({ summary: 'Login' })
     @ApiResponse({ status: 200, description: 'Login successful' })
     @ApiResponse({ status: 401, description: 'Invalid email or password' })
@@ -55,17 +58,20 @@ export class AuthController {
         return await this.authService.login(dto);
     }
 
+    // POST /auth/logout blacklist the current token
     @ApiOperation({ summary: 'Logout' })
     @ApiResponse({ status: 200, description: 'Logged out successfully' })
     @AllowUnverified()
     @UseGuards(JwtAuthGuard)
     @Post('logout')
     async logout(@NestHeaders('authorization') auth: string) {
+        // header is Bearer xxx so [1] = the token
         const token = auth.split(' ')[1];
         await this.authService.logout(token);
         return { message: 'Logged out successfully' };
     }
 
+    // GET /auth/verify email link from the mail (return a small html page)
     @ApiOperation({ summary: 'Verify email' })
     @ApiResponse({ status: 200, description: 'Email verified successfully' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
@@ -110,6 +116,7 @@ export class AuthController {
         return await this.authService.resendVerification(req.user.id);
     }
 
+    // GET /auth/google/web empty on purpose (the guard redirect to google)
     @ApiOperation({ summary: 'Redirect to Google OAuth (add ?link=<ticket> to link instead of log in)' })
     @ApiQuery({ name: 'link', required: false, description: 'Ticket from POST /auth/google/link-ticket' })
     @Get('google/web')
@@ -155,12 +162,14 @@ export class AuthController {
         return res.redirect(`${appUrl}#token=${encodeURIComponent(access_token)}`);
     }
 
+    // POST /auth/google/mobile login with a google id token from the app
     @Post('google/mobile')
     async googleMobile(@Body() body: { token: string }) {
         const identity = await this.authService.verifyGoogleToken(body.token);
         return await this.authService.handleGoogleUser(identity);
     }
 
+    // POST /auth/google/link ticket to start the google link flow
     @ApiOperation({ summary: 'Get a one-time ticket to link a Google account (then open /auth/google/web?link=<ticket>)' })
     @ApiBearerAuth()
     @UseGuards(JwtAuthGuard)
@@ -169,6 +178,7 @@ export class AuthController {
         return await this.authService.createGoogleLinkTicket(req.user.id);
     }
 
+    // DELETE /auth/google/link remove the google link
     @ApiOperation({ summary: 'Unlink the Google account' })
     @ApiBearerAuth()
     @ApiResponse({ status: 400, description: 'Account has no password, unlinking would lock the user out' })
@@ -178,6 +188,7 @@ export class AuthController {
         return await this.authService.unlinkGoogle(req.user.id);
     }
 
+    // POST /auth/forgot password send the reset mail
     @ApiOperation({ summary: 'Request password reset email' })
     @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
     @ThrottleAuth()
@@ -186,6 +197,7 @@ export class AuthController {
         return await this.authService.forgot_password(email);
     }
 
+    // POST /auth/reset password json version
     @ApiOperation({ summary: 'Reset password with token' })
     @ApiResponse({ status: 200, description: 'Password reset successfully' })
     @ApiResponse({ status: 400, description: 'Invalid or expired token' })
@@ -214,6 +226,7 @@ export class AuthController {
     @ThrottleAuth()
     @Post('reset-password/form')
     async resetPasswordForm(@Body() body: Record<string, string>, @Res() res: Response) {
+        // String() so a missing field become an empty string (no crash)
         const token = String(body?.token ?? '');
         const newPassword = String(body?.newPassword ?? '');
 

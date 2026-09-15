@@ -16,6 +16,7 @@ export const AVATAR_IDS = [
     'avatar-5', 'avatar-6', 'avatar-7', 'avatar-8',
 ] as const;
 
+// nested dto for the visibility (each field optional)
 export class VisibilitySettingsDto {
     @IsEnum(Visibility)
     @IsOptional()
@@ -36,6 +37,7 @@ export class VisibilitySettingsDto {
     listening?: Visibility;
 }
 
+// body to update the profile (all optional)
 export class UpdateProfileDto {
     @ApiProperty({
         example: 'Hello World! I am a music lover.',
@@ -50,6 +52,7 @@ export class UpdateProfileDto {
         example: 'avatar-3',
         description: "Un des 8 avatars predefinis (avatar-1..avatar-8), ou '' pour aucun avatar",
     })
+    // one of the 8 ids or empty string to remove
     @IsIn([...AVATAR_IDS, ''])
     @IsOptional()
     avatar?: string;

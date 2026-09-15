@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, layout, spacing } from '../config/theme';
 import { usePreviewPlayer } from '../context/PreviewPlayerContext';
 
+// height of the mini player bar
 export const MINI_PLAYER_HEIGHT = 60;
 
 // espace a reserver en bas d'un ecran : encoche/barre systeme + mini-player quand il est la.
@@ -44,6 +45,7 @@ export default function Screen({
   contentContainerStyle,
 }: ScreenProps) {
   const bottomInset = useBottomInset();
+  // the centered column with the max width (narrow wide or normal)
   const column = [
     styles.column,
     { maxWidth: narrow ? layout.maxWidthNarrow : wide ? layout.maxWidthWide : layout.maxWidth },
@@ -51,6 +53,7 @@ export default function Screen({
     contentContainerStyle,
   ];
 
+  // no scroll = a plain View (the screen has its own FlatList)
   if (!scroll) {
     return (
       <View style={[styles.root, style]}>
@@ -66,6 +69,7 @@ export default function Screen({
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
+      {/* the centered column inside the scroll */}
       <View style={column}>{children}</View>
     </ScrollView>
   );

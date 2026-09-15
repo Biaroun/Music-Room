@@ -21,6 +21,7 @@ export default function EmptyState({ icon, title, message, actionLabel, onAction
       </View>
       <Text style={styles.title}>{title}</Text>
       {message && <Text style={styles.message}>{message}</Text>}
+      {/* button only if we have the label AND the callback */}
       {actionLabel && onAction && (
         <Button title={actionLabel} onPress={onAction} variant="secondary" size="sm" fullWidth={false} style={styles.action} />
       )}

@@ -9,6 +9,7 @@ import {
 import { Match } from '../decorators/match.decorator';
 import { ApiProperty } from '@nestjs/swagger';
 
+// body for register (all the checks with french messages)
 export class RegisterDto {
   @ApiProperty({
     example: 'johndoe',
@@ -18,6 +19,7 @@ export class RegisterDto {
   @IsNotEmpty()
   @MinLength(3)
   @MaxLength(255, { message: "L'username est trop long." })
+  // only letters digits _ and the hyphen in the username
   @Matches(/^[a-zA-Z0-9_-]+$/, {
     message: "L'username ne peut contenir que des lettres, chiffres, - et _"
   })
@@ -42,6 +44,7 @@ export class RegisterDto {
   @MinLength(12, {
     message: 'Le mot de passe doit contenir au moins 12 caractères.',
   })
+  // lookaheads = at least 1 lower 1 upper 1 digit 1 special char
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/, {
     message:
         'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial.',
@@ -49,6 +52,7 @@ export class RegisterDto {
   @MaxLength(255, { message: 'Le mot de passe est trop long.' })
   password: string;
 
+  // must be the same as password (removed before saving)
   @ApiProperty({
     example: 'Test1234!@#$',
     description: 'Must match password',

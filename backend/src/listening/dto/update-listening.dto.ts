@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
+// body when the app say what track is playing
 export class UpdateListeningDto {
     @ApiProperty({ description: "L'id du morceau chez Deezer" })
     @IsString()

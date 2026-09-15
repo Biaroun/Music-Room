@@ -20,16 +20,19 @@ import { useToast } from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useRealtime, type FriendListening } from '../context/RealtimeContext';
 
+// bubble sizes in px (me friend then pending and strangers smaller)
 const ME_SZ = 82;
 const FR_SZ = 58;
 const PR_SZ = 50;   // pending recue - taille intermediaire pour se distinguer des inconnus
 const PS_SZ = 46;   // pending envoyee
 const OT_SZ = 44;
+// green = friends amber = pending received
 const GREEN = '#1DB954';
 const AMBER = '#f59e0b';
 // versions rgb : boxShadow a besoin de la couleur et de l'opacite dans la meme valeur
 const GREEN_RGB = '29,185,84';
 const AMBER_RGB = '245,158,11';
+// friend colors (on boucle dessus with i modulo)
 const COLORS = ['#e91e63',
                 '#8b5cf6',
                 '#f97316',
@@ -38,10 +41,13 @@ const COLORS = ['#e91e63',
                 '#f43f5e',
                 '#a855f7',
                 '#06b6d4'];
+// greys for the non friends
 const GREY = ['#4b5563', '#78716c', '#52525b', '#475569', '#57534e'];
 
+// relation between me and a bubble
 export type RelStatus = 'friend' | 'pending_sent' | 'pending_received' | 'stranger';
 
+// a bubble on the screen (ang in degrees dst in percent of vmin)
 export type Person = {
     key: string;
     relId: number | null;   // friendship id (friend) ou id de la demande pending (pending_sent/pending_received)
@@ -54,19 +60,23 @@ export type Person = {
     status: RelStatus;
 };
 
+// a user from users search
 type SearchResult = {
     id: number;
     username: string;
     avatar?: string | null;
 };
 
+// polar (angle + distance) to x y from the center (same as PoolBackgroundView)
 function toXY(ang: number, dst: number, vmin: number) {
     const rad = (ang * Math.PI) / 180;
     const d = (dst / 100) * vmin;
     return { x: Math.cos(rad) * d, y: Math.sin(rad) * d };
 }
 
+// 4 small offsets from the user id so each bubble float differently but always the same way
 function floatOffsets(id: number) {
+    // 137 508 = golden angle so close ids still give very different values
     const s = id * 137.508;
     return [
         +(Math.sin(s) * 8).toFixed(1),
@@ -76,6 +86,7 @@ function floatOffsets(id: number) {
     ];
 }
 
+// one floating bubble (size ring and colors depend on the status)
 function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; isSelected: boolean; onPress: () => void; vmin: number; listening?: FriendListening }) {
     const sz = p.status === 'friend' ? FR_SZ
         : p.status === 'pending_received' ? PR_SZ
@@ -88,6 +99,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
     const [x1, y1, x2, y2] = floatOffsets(p.userId);
     // demande recue = pulsation plus rapide/marquee pour sauter aux yeux
     const dur = (3200 + (p.userId % 5) * 220) * (p.status === 'pending_received' ? 0.6 : 1);
+    // start delay between 0 and 1800ms so the bubbles dont move all together
     const dly = (p.userId * 340) % 1800;
 
     const floatX = useSharedValue(0);
@@ -98,6 +110,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
     );
     const selectScale = useSharedValue(1);
 
+    // start the loops 1) float x 2) float y 3) ring pulse scale + opacity
     useEffect(() => {
         const ease = Easing.inOut(Easing.ease);
         floatX.value = withDelay(dly, withRepeat(
@@ -107,6 +120,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
                 withTiming(-x1 * 0.4, { duration: dur * 0.25, easing: ease }),
                 withTiming(0, { duration: dur * 0.2, easing: ease }),
             ),
+            // minus 1 = repeat forever
             -1,
         ));
         floatY.value = withDelay(dly, withRepeat(
@@ -136,6 +150,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
         ));
     }, []);
 
+    // grow a bit when selected
     useEffect(() => {
         selectScale.value = withTiming(isSelected ? 1.14 : 1, { duration: 250, easing: Easing.out(Easing.ease) });
     }, [isSelected]);
@@ -160,12 +175,14 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
             style={[styles.bubble, {
                 width: sz,
                 height: sz,
+                // minus half size to center the bubble on its point
                 marginLeft: -sz / 2 + x,
                 marginTop: -sz / 2 + y,
                 zIndex: isSelected ? 20 : 10,
             }]}
             >
             <Animated.View style={floatStyle}>
+                {/* pulsing ring behind the bubble */}
                 <Animated.View style={[styles.bubbleRing, {
                     width: sz * 1.4,
                     height: sz * 1.4,
@@ -178,6 +195,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
                         : 'rgba(255,255,255,0.055)',
                 }, ringStyle]} />
 
+                {/* the circle (avatar sinon gradient + 2 letters) */}
                 <Animated.View style={[
                     styles.bubbleCircle,
                     {
@@ -205,6 +223,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
                                 colors={
                                     p.status === 'pending_received' ? ['#f59e0b', '#b45309']
                                     : p.status === 'pending_sent' ? ['#1a5c38', '#123f26']
+                                    // 80 hex at the end = 50 percent alpha
                                     : [p.color, p.color + '80']
                                 }
                                 start={{ x: 0.2, y: 0 }}
@@ -223,6 +242,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
                     </View>
                 )}
 
+                {/* username under the bubble (dim if not a friend) */}
                 <Text style={[styles.bubbleName, {
                     color: p.status === 'friend' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.25)',
                 }]}>{p.username}</Text>
@@ -231,6 +251,7 @@ function UserBubble({ p, isSelected, onPress, vmin, listening }: { p: Person; is
     );
 }
 
+// one ripple ring that grow and fade around my bubble
 function MeRipple({ delay }: { delay: number }) {
     const scale = useSharedValue(1);
     const opacity = useSharedValue(0.6);
@@ -238,6 +259,7 @@ function MeRipple({ delay }: { delay: number }) {
     useEffect(() => {
         scale.value = withDelay(delay, withRepeat(
             withSequence(
+                // duration 0 = jump back to the start before each ripple
                 withTiming(1, { duration: 0 }),
                 withTiming(3.6, { duration: 3400, easing: Easing.out(Easing.ease) }),
             ),
@@ -260,6 +282,7 @@ function MeRipple({ delay }: { delay: number }) {
     return <Animated.View style={[styles.meRing, ringStyle]} />;
 }
 
+// my bubble in the center (breathing + 3 ripples)
 function MeBubble({ avatarId }: { avatarId: string | null }) {
     const breathScale = useSharedValue(1);
     const avatar = getAvatar(avatarId);
@@ -280,6 +303,7 @@ function MeBubble({ avatarId }: { avatarId: string | null }) {
 
     return (
         <View style={styles.meWrapper}>
+            {/* 3 ripples shifted by 1130ms (about a third of the 3400ms anim) */}
             {[0, 1, 2].map(i => (
                 <MeRipple key={i} delay={i * 1130} />
             ))}
@@ -305,11 +329,13 @@ function MeBubble({ avatarId }: { avatarId: string | null }) {
     );
 }
 
+// friends screen as a pool (me in the center friends pending and strangers around)
 export default function FriendsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
     const { showToast } = useToast();
     const { friendsListening } = useRealtime();
     const { width: W, height: H } = useWindowDimensions();
+    // vmin = smallest side of the screen (like css vmin)
     const vmin = Math.min(W, H);
     const cx = W / 2;
     const cy = H / 2;
@@ -326,8 +352,10 @@ export default function FriendsScreen({ navigation }: any) {
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [searching, setSearching] = useState(false);
     const [searchUnavailable, setSearchUnavailable] = useState(false);
+    // user waiting for the block confirm (null = dialog closed)
     const [blockTarget, setBlockTarget] = useState<{ id: number; username: string } | null>(null);
 
+    // 1) load friends 2) load pending blocked and all users 3) give a status and a place to each one
     const loadData = useCallback(async () => {
         let mappedFriends: Person[] = [];
         try {
@@ -339,7 +367,9 @@ export default function FriendsScreen({ navigation }: any) {
                 username: f.username,
                 avatar: f.avatar ?? null,
                 color: COLORS[i % COLORS.length],
+                // friends spread evenly on the circle
                 ang: friendData.length ? (360 / friendData.length) * i : 0,
+                // 22 or 26 one on two so neighbours dont overlap
                 dst: 22 + (i % 2) * 4,
                 status: 'friend' as const,
             }));
@@ -383,6 +413,7 @@ export default function FriendsScreen({ navigation }: any) {
             });
 
             const pendingOnes = withStatus.filter(w => w.status !== 'stranger');
+            // max 6 strangers (sinon the screen is full)
             const strangers = withStatus.filter(w => w.status === 'stranger').slice(0, 6);
             const combined = [...pendingOnes, ...strangers];
 
@@ -395,7 +426,9 @@ export default function FriendsScreen({ navigation }: any) {
                 username: u.username,
                 avatar: u.avatar ?? null,
                 color: GREY[i % GREY.length],
+                // max(1) so no divide by 0 and +30 deg to not line up with the friends
                 ang: (360 / Math.max(combined.length, 1)) * i + 30,
+                // outer ring (36 38 or 40)
                 dst: 36 + (i % 3) * 2,
                 status,
             }));
@@ -408,12 +441,15 @@ export default function FriendsScreen({ navigation }: any) {
         setLoading(false);
     }, [token]);
 
+    // load at mount and when the token change
     useEffect(() => { loadData(); }, [loadData]);
 
+    // my avatar for the center bubble
     useEffect(() => {
         apiFetch('/users/me', token).then(me => setMyAvatar(me.avatar || null)).catch(() => {});
     }, [token]);
 
+    // search users for the add modal (error = search unavailable message)
     async function searchUsers(q: string) {
         setSearchQuery(q);
         setSearching(true);
@@ -429,10 +465,12 @@ export default function FriendsScreen({ navigation }: any) {
         }
     }
 
+    // open the modal = list everybody (empty query)
     useEffect(() => {
         if (searchOpen) searchUsers('');
     }, [searchOpen]);
 
+    // send a friend request then close the modal and reload
     async function sendRequest(targetId: number) {
         try {
             const res = await apiFetch(`/friendship/request/${targetId}`, token, { method: 'POST' });
@@ -446,6 +484,7 @@ export default function FriendsScreen({ navigation }: any) {
         }
     }
 
+    // cancel a request I sent
     async function cancelSentRequest(requestId: number) {
         try {
             await apiFetch(`/friendship/request/${requestId}`, token, { method: 'DELETE' });
@@ -455,6 +494,7 @@ export default function FriendsScreen({ navigation }: any) {
         }
     }
 
+    // accept or reject a request I received
     async function respondToRequest(requestId: number, action: 'accept' | 'reject') {
         try {
             await apiFetch(`/friendship/${requestId}/${action}`, token, { method: 'PATCH' });
@@ -464,10 +504,12 @@ export default function FriendsScreen({ navigation }: any) {
         }
     }
 
+    // open the block confirm dialog
     function confirmBlock(targetId: number, username: string) {
         setBlockTarget({ id: targetId, username });
     }
 
+    // block the user after the confirm and reload
     async function performBlock() {
         if (!blockTarget) return;
         const { id, username } = blockTarget;
@@ -481,8 +523,10 @@ export default function FriendsScreen({ navigation }: any) {
         }
     }
 
+    // all the bubbles (friends then the others)
     const everyone = useMemo(() => [...friends, ...others], [friends, others]);
     const selected = everyone.find(p => p.key === selKey) ?? null;
+    // only friends show what they listen
     const selectedListening = selected?.status === 'friend' ? friendsListening[selected.userId] : undefined;
 
     if (loading) {
@@ -496,8 +540,10 @@ export default function FriendsScreen({ navigation }: any) {
 
     return (
         <View style={styles.container}>
+            {/* animated pool background with the lines to the friends */}
             <PoolBackground friends={friends} width={W} height={H} vmin={vmin} cx={cx} cy={cy} />
 
+            {/* header back title friend count add button */}
             <View style={[styles.header, { top: insets.top + 16 }]}>
                 <View style={styles.headerLeft}>
                     <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -517,6 +563,7 @@ export default function FriendsScreen({ navigation }: any) {
                 </TouchableOpacity>
             </View>
 
+            {/* all the bubbles around me */}
             <View style={styles.orbitZone}>
                 {everyone.map(p => (
                     <UserBubble
@@ -532,6 +579,7 @@ export default function FriendsScreen({ navigation }: any) {
                 <MeBubble avatarId={myAvatar} />
             </View>
 
+            {/* no friend yet */}
             {friends.length === 0 && (
                 <Text style={styles.emptyText}>Aucun ami pour l'instant</Text>
             )}
@@ -557,6 +605,7 @@ export default function FriendsScreen({ navigation }: any) {
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.cardName}>{selected.username}</Text>
+                            {/* current track of the friend sinon a status text */}
                             {selected.status === 'friend' && selectedListening ? (
                                 <View style={styles.nowPlaying}>
                                     {selectedListening.cover ? (
@@ -581,6 +630,7 @@ export default function FriendsScreen({ navigation }: any) {
                             )}
                         </View>
                     </View>
+                    {/* actions depend on the status */}
                     <View style={styles.cardActions}>
                         {selected.status === 'friend' && ['Voir le profil', 'Inviter à ecouter'].map(lbl => (
                             <TouchableOpacity
@@ -643,6 +693,7 @@ export default function FriendsScreen({ navigation }: any) {
                 </View>
             </View>
 
+            {/* add a friend modal (search + add buttons) */}
             <Modal visible={searchOpen} animationType="slide" transparent onRequestClose={() => setSearchOpen(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
@@ -683,6 +734,7 @@ export default function FriendsScreen({ navigation }: any) {
                 </View>
             </Modal>
 
+            {/* block confirm */}
             <ConfirmDialog
                 visible={!!blockTarget}
                 title="Bloquer cet utilisateur ?"
@@ -832,6 +884,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#000',
     },
+    // 0x0 box in the center so the bubbles are placed with margins from the middle
     orbitZone: {
         width: 0,
         height: 0,

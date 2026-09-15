@@ -14,12 +14,14 @@ import {
 import { useDerivedValue } from 'react-native-reanimated';
 import type { Person } from './FriendsScreen';
 
+// polar (angle in deg + distance in percent of vmin) to x y from the center
 function toXY(ang: number, dst: number, vmin: number) {
     const rad = (ang * Math.PI) / 180;
     const d = (dst / 100) * vmin;
     return { x: Math.cos(rad) * d, y: Math.sin(rad) * d };
 }
 
+// skia shader of the pool (gradient tiles moving bubbles sparkles vignette)
 const POOL_SHADER = `
 uniform float2 u_resolution;
 uniform float u_time;
@@ -78,6 +80,7 @@ half4 main(float2 fragCoord) {
 }
 `;
 
+// friends to link + canvas size + center
 export type PoolBackgroundProps = {
     friends: Person[];
     width: number;
@@ -87,17 +90,21 @@ export type PoolBackgroundProps = {
     cy: number;
 };
 
+// animated pool background + a dashed line from the center to each friend
 export default function PoolBackground({ friends, width, height, vmin, cx, cy }: PoolBackgroundProps) {
     const clock = useClock();
     const effect = useMemo(() => Skia.RuntimeEffect.Make(POOL_SHADER), []);
 
     const uniforms = useDerivedValue(() => ({
         u_resolution: [width, height],
+        // clock is in ms and the shader want seconds
         u_time: clock.value / 1000,
     }));
 
+    // dash offset that move 15px per second so the lines look alive
     const phase = useDerivedValue(() => -(clock.value / 1000) * 15);
 
+    // shader didnt compile = nothing to draw
     if (!effect) {
         return null;
     }
@@ -108,6 +115,7 @@ export default function PoolBackground({ friends, width, height, vmin, cx, cy }:
                 <Shader source={effect} uniforms={uniforms} />
             </Fill>
 
+            {/* one gradient dashed line per friend */}
             {friends.map(p => {
                 const { x, y } = toXY(p.ang, p.dst, vmin);
                 return (

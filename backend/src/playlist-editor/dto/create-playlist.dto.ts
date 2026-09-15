@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
+// body to create a playlist
 export class CreatePlaylistDto {
     @ApiProperty({ example: 'My Playlist' })
     @IsString()

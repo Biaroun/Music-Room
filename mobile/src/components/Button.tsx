@@ -10,6 +10,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors, radius, spacing } from '../config/theme';
 
+// the 4 looks of a button
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 type ButtonProps = {
@@ -38,6 +39,7 @@ export default function Button({
   style,
 }: ButtonProps) {
   const [hovered, setHovered] = useState(false);
+  // loading also block the press (no double submit)
   const inactive = disabled || loading;
   const v = VARIANTS[variant];
 
@@ -57,10 +59,12 @@ export default function Button({
         hovered && !inactive && { backgroundColor: v.bgHover },
         pressed && !inactive && { backgroundColor: v.bgPressed, transform: [{ scale: 0.985 }] },
         inactive && styles.inactive,
+        // cursor is only used on web
         { cursor: inactive ? 'auto' : 'pointer' },
         style,
       ]}
     >
+      {/* spinner while loading sinon icon + title */}
       {loading ? (
         <ActivityIndicator size="small" color={v.fg} />
       ) : (
@@ -73,6 +77,7 @@ export default function Button({
   );
 }
 
+// colors of each variant (normal hover pressed text border)
 const VARIANTS: Record<Variant, { bg: string; bgHover: string; bgPressed: string; fg: string; border: string }> = {
   primary: {
     bg: colors.accent,
@@ -110,6 +115,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
+    // 48 = min touch size
     minHeight: 48,
     paddingVertical: spacing.sm + 4,
     paddingHorizontal: spacing.lg,

@@ -18,6 +18,7 @@ import { check, sleep } from 'k6';
 import { Trend } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 
+// config from the env (target peak users stage duration)
 const API_URL = __ENV.API_URL || 'http://localhost:3000';
 const PEAK_VUS = Number(__ENV.PEAK_VUS || 200);
 const STAGE = __ENV.STAGE || '1m';
@@ -34,14 +35,17 @@ const CLIENT_HEADERS = {
     'x-client-app-version': '1.0.0',
 };
 
+// request params with the device headers + the jwt of this user
 function headersFor(user) {
     return { headers: { ...CLIENT_HEADERS, 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` } };
 }
 
+// each VU get its own user (__VU start at 1 so minus 1 and modulo if more VUs than users)
 function pickUser() {
     return users[(__VU - 1) % users.length];
 }
 
+// custom metric for the add track time (true = its a time in ms)
 const editLatency = new Trend('playlist_edit_duration', true);
 
 // deux modes exclusifs :
@@ -60,6 +64,7 @@ const rampScenarios = {
         exec: 'browse',
         startVUs: 0,
         stages: [
+            // 10 25 50 then 100 percent of the peak held 2 stages then back to 0
             { duration: STAGE, target: Math.round(PEAK_VUS * 0.1) },
             { duration: STAGE, target: Math.round(PEAK_VUS * 0.25) },
             { duration: STAGE, target: Math.round(PEAK_VUS * 0.5) },
@@ -74,8 +79,10 @@ const rampScenarios = {
         executor: 'ramping-vus',
         exec: 'edit',
         startVUs: 0,
+        // edit start 1 stage later when some readers are already there
         startTime: STAGE,
         stages: [
+            // 5 then 10 percent of the peak (at least 1 VU)
             { duration: STAGE, target: Math.max(1, Math.round(PEAK_VUS * 0.05)) },
             { duration: STAGE, target: Math.max(1, Math.round(PEAK_VUS * 0.1)) },
             { duration: STAGE, target: Math.max(1, Math.round(PEAK_VUS * 0.1)) },
@@ -84,6 +91,7 @@ const rampScenarios = {
     },
 };
 
+// 1 VU that try the bruteforce once
 const throttleScenario = {
     brute_force: {
         executor: 'per-vu-iterations',
@@ -93,9 +101,11 @@ const throttleScenario = {
     },
 };
 
+// pick the scenario from CHECK_THROTTLE and the pass fail thresholds
 export const options = {
     scenarios: CHECK_THROTTLE ? throttleScenario : rampScenarios,
     thresholds: CHECK_THROTTLE
+        // throttle check = 99 percent checks ok sinon less than 1 percent errors + p95 p99 limits in ms
         ? { checks: ['rate>0.99'] }
         : {
               'http_req_failed{scenario:browse}': ['rate<0.01'],
@@ -152,6 +162,7 @@ export function edit() {
     editLatency.add(added.timings.duration);
     const created = check(added, { 'POST /tracks → 201': (r) => r.status === 201 });
 
+    // delete only if the add worked (sinon no id)
     if (created) {
         const trackId = added.json('id');
         const removed = http.del(`${API_URL}/playlist-editor/${user.playlistId}/tracks/${trackId}`, null, params);
@@ -166,6 +177,7 @@ export function edit() {
  * continuer a comparer des mots de passe.
  */
 export function bruteForce() {
+    // 15 tries against a limit of 5 per minute
     const attempts = 15;
     let throttled = 0;
 
@@ -175,6 +187,7 @@ export function bruteForce() {
             JSON.stringify({ login: 'brute-force@musicroom.local', password: `wrong-${i}` }),
             { headers: { ...CLIENT_HEADERS, 'Content-Type': 'application/json' }, tags: { name: 'auth-bruteforce' } },
         );
+        // 429 = blocked by the throttler
         if (res.status === 429) throttled++;
     }
 

@@ -8,6 +8,7 @@ import { ListeningController } from './listening.controller';
 import { ListeningGateway } from './listening.gateway';
 import { User } from '../users/user.entity';
 
+// listening module (rest + gateway on the redis now playing)
 @Module({
   imports: [
     FriendshipModule,

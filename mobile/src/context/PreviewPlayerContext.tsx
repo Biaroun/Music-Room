@@ -3,6 +3,7 @@ import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, type AudioPlay
 import { storage } from '../config/storage';
 import { useRealtime } from './RealtimeContext';
 
+// a track the mini player can play (30s preview)
 export type PreviewTrack = {
   id: string;
   title: string;
@@ -38,6 +39,7 @@ const CROSSFADE_SEC = 4;
 const CROSSFADE_TICK_MS = 100;
 // au dela de 8% d'ecart ca sonne bizarre meme avec pitch correction, donc on ne force pas.
 const BPM_TOLERANCE = 0.08;
+// storage keys of the player settings
 const TRANSITIONS_SETTING_KEY = 'transitions_enabled';
 const VOLUME_SETTING_KEY = 'preview_volume';
 
@@ -46,11 +48,13 @@ const VOLUME_SETTING_KEY = 'preview_volume';
 // et on garde celui le plus proche de 1. rien de bon dans les 8% -> null (fondu simple).
 function computeSyncRate(outgoingBpm: number, incomingBpm: number): number | null {
   const raw = outgoingBpm / incomingBpm;
+  // raw = same tempo /2 and x2 = half time or double time
   const candidates = [raw, raw / 2, raw * 2];
   const best = candidates.reduce((a, b) => (Math.abs(b - 1) < Math.abs(a - 1) ? b : a));
   return Math.abs(best - 1) <= BPM_TOLERANCE ? best : null;
 }
 
+// the audio player of the app (2 decks crossfade bpm sync queue volume)
 export function PreviewPlayerProvider({ children }: { children: React.ReactNode }) {
   // deux platines comme un DJ: pendant que l'une joue (le "front"), l'autre precharge le
   // morceau suivant. impossible d'avoir deux sons en meme temps avec un seul player.
@@ -64,6 +68,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   const [transitionsEnabled, setTransitionsEnabledState] = useState(true);
   const [volume, setVolumeState] = useState(1);
 
+  // the list we play in (null = single track no next no previous)
   const queueRef = useRef<PreviewTrack[] | null>(null);
   // copies "toujours a jour" du state, pour que le listener audio (branche une seule fois
   // plus bas) lise la vraie valeur au lieu d'une valeur figee au moment de sa creation.
@@ -72,14 +77,17 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   const transitionsEnabledRef = useRef(true);
   const volumeRef = useRef(1);
   const crossfadingRef = useRef(false);
+  // id of the track we already started a fade for
   const crossfadeTriggeredForRef = useRef<string | null>(null);
   const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // keep the refs in sync with the state
   useEffect(() => { activeTrackRef.current = activeTrack; }, [activeTrack]);
   useEffect(() => { frontKeyRef.current = frontKey; }, [frontKey]);
   useEffect(() => { transitionsEnabledRef.current = transitionsEnabled; }, [transitionsEnabled]);
 
   useEffect(() => {
+    // play even when the phone is on silent (ios)
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
     // relit les reglages sauves au demarrage (sinon on reste sur le defaut le temps que ca charge)
     storage.getItem(TRANSITIONS_SETTING_KEY).then((v) => {
@@ -95,6 +103,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     });
   }, []);
 
+  // turn the crossfade on or off and save it (1 or 0)
   function setTransitionsEnabled(enabled: boolean) {
     setTransitionsEnabledState(enabled);
     storage.setItem(TRANSITIONS_SETTING_KEY, enabled ? '1' : '0').catch(() => {});
@@ -117,10 +126,12 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     }
   }
 
+  // the player behind the key A or B
   function getDeck(key: 'A' | 'B'): AudioPlayer {
     return key === 'A' ? deckA : deckB;
   }
 
+  // stop the fade interval if there is one
   function clearCrossfadeTimer() {
     if (crossfadeTimerRef.current) {
       clearInterval(crossfadeTimerRef.current);
@@ -156,6 +167,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   function advanceHardCut() {
     const queue = queueRef.current;
     const current = activeTrackRef.current;
+    // position of the current track in the queue (idx + 1 = the next one)
     const idx = queue?.findIndex((t) => t.id === current?.id) ?? -1;
     const next = queue && idx >= 0 ? queue[idx + 1] : undefined;
     if (next) {
@@ -184,6 +196,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     inDeck.replace(next.previewUrl);
     inDeck.play();
 
+    // 4000ms / 100ms = 40 steps
     const steps = Math.round((CROSSFADE_SEC * 1000) / CROSSFADE_TICK_MS);
     let step = 0;
     clearCrossfadeTimer();
@@ -249,12 +262,14 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckA, deckB]);
 
+  // computed at each render for the next and previous buttons
   const queue = queueRef.current;
   const activeIndex = queue?.findIndex((t) => t.id === activeTrack?.id) ?? -1;
   const hasNext = !!queue && activeIndex >= 0 && activeIndex < queue.length - 1;
   const hasPrevious = !!queue && activeIndex > 0;
   const frontStatus = frontKey === 'A' ? statusA : statusB;
 
+  // same track = play pause sinon start the new track with its queue
   function toggle(track: PreviewTrack, newQueue?: PreviewTrack[]) {
     if (activeTrack?.id === track.id) {
       frontStatus.playing ? getDeck(frontKey).pause() : getDeck(frontKey).play();
@@ -273,12 +288,14 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
     playAt(queue[activeIndex + 1], frontKey);
   }
 
+  // go back one track (hard cut too)
   function previous() {
     if (!hasPrevious || !queue) return;
     abortCrossfade(frontKey);
     playAt(queue[activeIndex - 1], frontKey);
   }
 
+  // stop everything and hide the mini player
   function stop() {
     abortCrossfade(frontKey);
     queueRef.current = null;
@@ -327,6 +344,7 @@ export function PreviewPlayerProvider({ children }: { children: React.ReactNode 
   );
 }
 
+// hook to use the player (crash if outside the provider)
 export function usePreviewPlayer() {
   const ctx = useContext(PreviewPlayerContext);
   if (!ctx) throw new Error('usePreviewPlayer must be used inside PreviewPlayerProvider');

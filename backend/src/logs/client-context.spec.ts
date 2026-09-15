@@ -1,3 +1,4 @@
+// TL;DR test reading platform device version from http headers and socket handshake
 import {
     APP_VERSION_HEADER,
     DEVICE_HEADER,

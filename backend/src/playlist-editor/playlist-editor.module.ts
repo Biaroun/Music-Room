@@ -10,6 +10,7 @@ import { PlaylistTrack } from './playlist-track.entity';
 import { PlaylistCollaborator } from './playlist-collaborator.entity';
 import { User } from '../users/user.entity';
 
+// playlist editor module (rest + gateway)
 @Module({
   imports: [
     TypeOrmModule.forFeature([Playlist, PlaylistTrack, PlaylistCollaborator, User]),

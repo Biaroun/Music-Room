@@ -1,3 +1,4 @@
+// TL;DR test subscribe cancel and isPremium
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';

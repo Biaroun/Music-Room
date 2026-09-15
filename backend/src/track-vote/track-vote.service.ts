@@ -13,6 +13,7 @@ import { AddTrackDto } from '../playlist-editor/dto/add-track.dto';
 // morceau : sert de duree de lecture pour la file
 export const PREVIEW_DURATION_MS = 30_000;
 
+// one line of the vote board
 export type BoardTrack = {
     trackId: number;
     deezerId: string;
@@ -23,6 +24,7 @@ export type BoardTrack = {
     myVote: boolean;
 };
 
+// the track playing now in the event (startedAt in ms)
 export type NowPlaying = {
     trackId: number;
     deezerId: string;
@@ -34,14 +36,17 @@ export type NowPlaying = {
     durationMs: number;
 };
 
+// what the clients get (ranked tracks + now playing)
 export type Board = {
     tracks: BoardTrack[];
     nowPlaying: NowPlaying | null;
     updatedAt: number;
 };
 
+// what we keep in redis for the current track
 type NowPlayingState = { trackId: number; startedAt: number };
 
+// vote logic (suggest import vote board and the play queue)
 @Injectable()
 export class TrackVoteService {
     constructor(
@@ -55,6 +60,7 @@ export class TrackVoteService {
     // le controle d'acces reste dans EventService : ici on suppose l'appelant
     // l'a deja fait
 
+    // add a suggested track at the end of the event playlist
     async suggestTrack(eventId: number, dto: AddTrackDto): Promise<PlaylistTrack> {
         const event = await this.eventService.findOne(eventId);
         const position = await this.tracks.count({ where: { playlist: { id: event.playlist.id } } });
@@ -79,6 +85,7 @@ export class TrackVoteService {
 
         const existing = await this.tracks.find({ where: { playlist: { id: event.playlist.id } } });
         const existingDeezerIds = new Set(existing.map((t) => t.deezerId));
+        // new tracks go after the ones already there
         let position = existing.length;
 
         const rows = source.tracks
@@ -122,6 +129,7 @@ export class TrackVoteService {
             .execute();
     }
 
+    // remove my vote for one track
     async retractVote(eventId: number, voterId: number, trackId: number): Promise<void> {
         await this.votes.delete({ event: { id: eventId }, voter: { id: voterId }, track: { id: trackId } });
     }
@@ -161,7 +169,9 @@ export class TrackVoteService {
                 myVote: false,
                 position: t.position,
             }))
+            // most votes first and egalite = lowest position first
             .sort((a, b) => b.voteCount - a.voteCount || a.position - b.position)
+            // on vire position (only used for the sort)
             .map(({ position, ...rest }) => rest);
 
         const nowPlaying = await this.buildNowPlaying(eventId, tracks);
@@ -178,10 +188,12 @@ export class TrackVoteService {
     private async ensureAdvanced(eventId: number): Promise<void> {
         const state = await this.getNowPlayingState(eventId);
         const now = Date.now();
+        // current track not finished yet so nothing to do
         if (state && now - state.startedAt < PREVIEW_DURATION_MS) return;
 
         if (state) {
             const result = await this.tracks.update({ id: state.trackId, playedAt: IsNull() }, { playedAt: new Date() });
+            // affected 0 = another call already moved the queue
             if (!result.affected) return;
         }
 
@@ -190,9 +202,11 @@ export class TrackVoteService {
             await this.cache.del(this.nowPlayingKey(eventId));
             return;
         }
+        // ttl = track duration + 5s of margin
         await this.cache.set(this.nowPlayingKey(eventId), { trackId: next.id, startedAt: now }, PREVIEW_DURATION_MS + 5_000);
     }
 
+    // the not played track with the most votes (egalite = lowest position)
     private async pickNextTrack(eventId: number): Promise<PlaylistTrack | null> {
         const event = await this.eventService.findOne(eventId);
         const candidates = await this.tracks.find({
@@ -206,6 +220,7 @@ export class TrackVoteService {
             .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.position - b.position)[0];
     }
 
+    // count the votes per track in sql (map trackId = count)
     private async voteCounts(eventId: number): Promise<Map<number, number>> {
         const counts = await this.votes
             .createQueryBuilder('vote')
@@ -214,17 +229,21 @@ export class TrackVoteService {
             .where('vote.eventId = :eventId', { eventId })
             .groupBy('vote.trackId')
             .getRawMany<{ trackId: number; voteCount: string }>();
+        // postgres send COUNT as a string so parseInt
         return new Map(counts.map((c) => [c.trackId, parseInt(c.voteCount, 10)]));
     }
 
+    // redis key of the now playing of an event
     private nowPlayingKey(eventId: number): string {
         return `trackvote:nowplaying:${eventId}`;
     }
 
+    // read the now playing state from redis
     private async getNowPlayingState(eventId: number): Promise<NowPlayingState | null> {
         return (await this.cache.get<NowPlayingState>(this.nowPlayingKey(eventId))) ?? null;
     }
 
+    // build the full now playing (extra query if the track is not in loadedTracks)
     private async buildNowPlaying(eventId: number, loadedTracks: PlaylistTrack[]): Promise<NowPlaying | null> {
         const state = await this.getNowPlayingState(eventId);
         if (!state) return null;
@@ -244,6 +263,7 @@ export class TrackVoteService {
         };
     }
 
+    // true if the track is in the event playlist and not played yet
     private async trackBelongsToEvent(eventId: number, trackId: number): Promise<boolean> {
         const event = await this.eventService.findOne(eventId);
         const track = await this.tracks.findOne({

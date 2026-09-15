@@ -1,5 +1,6 @@
 import { apiFetch } from '../config/api';
 
+// a track of a playlist as the api send it
 export type ApiPlaylistTrack = {
   id: number;
   deezerId: string;
@@ -30,6 +31,7 @@ export type ApiPlaylist = {
   updatedAt: string;
 };
 
+// an editor of the playlist
 export type PlaylistCollaborator = {
   id: number;
   username: string;
@@ -49,6 +51,7 @@ export type PlaylistState = {
   updatedAt: number;
 };
 
+// body to add a track
 export type AddTrackInput = {
   deezerId: string;
   title: string;
@@ -59,18 +62,22 @@ export type AddTrackInput = {
   bpm?: number | null;
 };
 
+// my playlists (owned + shared)
 export function listMyPlaylists(token: string | null): Promise<ApiPlaylist[]> {
   return apiFetch('/playlist-editor', token);
 }
 
+// one playlist with its tracks
 export function getPlaylist(id: number, token: string | null): Promise<ApiPlaylist> {
   return apiFetch(`/playlist-editor/${id}`, token);
 }
 
+// create a playlist
 export function createPlaylist(token: string | null, body: { name: string; isPublic?: boolean }): Promise<ApiPlaylist> {
   return apiFetch('/playlist-editor', token, { method: 'POST', body: JSON.stringify(body) });
 }
 
+// rename or change visibility or license
 export function updatePlaylist(
   id: number,
   token: string | null,
@@ -79,14 +86,17 @@ export function updatePlaylist(
   return apiFetch(`/playlist-editor/${id}`, token, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
+// delete a playlist
 export function deletePlaylist(id: number, token: string | null): Promise<void> {
   return apiFetch(`/playlist-editor/${id}`, token, { method: 'DELETE' });
 }
 
+// add a track (rest fallback)
 export function addTrackToPlaylist(id: number, token: string | null, dto: AddTrackInput): Promise<ApiPlaylistTrack> {
   return apiFetch(`/playlist-editor/${id}/tracks`, token, { method: 'POST', body: JSON.stringify(dto) });
 }
 
+// remove a track (rest fallback)
 export function removeTrackFromPlaylist(playlistId: number, trackId: number, token: string | null): Promise<void> {
   return apiFetch(`/playlist-editor/${playlistId}/tracks/${trackId}`, token, { method: 'DELETE' });
 }
@@ -105,10 +115,12 @@ export function reorderPlaylistTracks(
   });
 }
 
+// list the editors
 export function listCollaborators(playlistId: number, token: string | null): Promise<PlaylistCollaborator[]> {
   return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token);
 }
 
+// invite an editor
 export function addCollaborator(playlistId: number, token: string | null, userId: number): Promise<unknown> {
   return apiFetch(`/playlist-editor/${playlistId}/collaborators`, token, {
     method: 'POST',
@@ -116,6 +128,7 @@ export function addCollaborator(playlistId: number, token: string | null, userId
   });
 }
 
+// remove an editor
 export function removeCollaborator(playlistId: number, token: string | null, userId: number): Promise<void> {
   return apiFetch(`/playlist-editor/${playlistId}/collaborators/${userId}`, token, { method: 'DELETE' });
 }

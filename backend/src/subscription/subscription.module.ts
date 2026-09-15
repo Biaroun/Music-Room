@@ -5,6 +5,7 @@ import { MailModule } from '../mail/mail.module';
 import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
 
+// subscription module (service exported for track vote)
 @Module({
   imports: [TypeOrmModule.forFeature([User]), MailModule],
   controllers: [SubscriptionController],

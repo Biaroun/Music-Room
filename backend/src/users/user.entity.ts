@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+// how the account was created
 export enum OAuthProvider {
   LOCAL = 'local',
   GOOGLE = 'google',
@@ -21,6 +22,7 @@ export enum SubscriptionPlan {
 }
 
 
+// genres a user can pick in the profile
 export enum MusicGenre {
   RAP = 'rap',
   RNB = 'rnb',
@@ -34,12 +36,14 @@ export enum MusicGenre {
   COUNTRY = 'country',
 }
 
+// visibility of a profile field
 export enum Visibility {
   PUBLIC = 'public',
   FRIENDS_ONLY = 'friends-only',
   PRIVATE = 'private',
 }
 
+// one visibility per profile field
 export interface VisibilitySettings {
   username: Visibility;
   bio: Visibility;
@@ -61,6 +65,7 @@ export interface GoogleIdentity {
   username: string;
 }
 
+// the user table
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -78,6 +83,7 @@ export class User {
   @Column({ default: false })
   emailisVerified: boolean;
 
+  // select false = never loaded unless we ask for it (null for google accounts)
   @Column({ nullable: true, select: false})
   password: string;
 
@@ -98,6 +104,7 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   avatar: string | null;
 
+  // simple array = stored as a comma list in one column
   @Column('simple-array', { nullable: true })
   musicpreferences: MusicGenre[];
 
@@ -110,6 +117,7 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   emailVerificationExpires: Date | null;
 
+  // reset token + expiry (cleared after use)
   @Column({ type: 'varchar', nullable: true })
   passwordResetToken: string | null;
 

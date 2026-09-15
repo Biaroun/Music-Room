@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsLatitude, IsLongitude, IsOptional } from 'class-validator';
 
+// body to vote (track + optional gps)
 export class CastVoteDto {
     @ApiProperty({ description: 'Id de la piste (PlaylistTrack) pour laquelle voter' })
     @IsInt()

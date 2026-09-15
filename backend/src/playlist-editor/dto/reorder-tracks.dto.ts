@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsArray, IsInt, IsOptional } from 'class-validator';
 
+// body to reorder (all the track ids in the new order + version)
 export class ReorderTracksDto {
     @ApiProperty({ type: [Number], description: "ids des lignes de tracks, dans l'ordre voulu" })
     @IsArray()

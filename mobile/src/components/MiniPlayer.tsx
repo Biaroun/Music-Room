@@ -6,6 +6,7 @@ import { colors, radius, spacing } from "../config/theme";
 import { usePreviewPlayer } from "../context/PreviewPlayerContext";
 import { MINI_PLAYER_HEIGHT } from "./Screen";
 
+// seconds to minutes and 2 digit seconds text (bad value = zero)
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -13,6 +14,7 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// small round icon button with hover (web) and pressed state
 function IconButton({
   onPress,
   disabled,
@@ -51,8 +53,10 @@ function IconButton({
 // pas juste le tap.
 function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: number) => void }) {
   const trackRef = useRef<View>(null);
+  // position and width of the bar on the page (width 1 so no divide by 0)
   const layoutRef = useRef({ pageX: 0, width: 1 });
 
+  // finger x on the page to a volume between 0 and 1 (setVolume clamp it)
   function updateFromPageX(pageX: number) {
     const { pageX: trackX, width } = layoutRef.current;
     if (width <= 0) return;
@@ -68,6 +72,7 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
     }),
   ).current;
 
+  // read where the bar is on the page (on skip NaN values)
   function measureTrack() {
     trackRef.current?.measure((_x, _y, width, _height, pageX) => {
       if (Number.isFinite(pageX) && Number.isFinite(width) && width > 0) {
@@ -90,6 +95,7 @@ function VolumeSlider({ volume, onChange }: { volume: number; onChange: (v: numb
   );
 }
 
+// player bar fixed at the bottom (nothing if no track)
 export default function MiniPlayer() {
   const {
     activeTrack,
@@ -115,16 +121,19 @@ export default function MiniPlayer() {
   // sur telephone la place manque : le temps passe a la trappe avant le titre
   const showTime = width >= 480;
 
+  // progress 0 to 1 for the green line on top
   const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
 
   return (
     // paddingBottom : sur iPhone la barre passerait sous l'indicateur d'accueil sinon
     <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
+      {/* progress line on top of the bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
 
       <View style={styles.row}>
+        {/* cover + title artist */}
         <View style={styles.art}>
           {activeTrack.cover ? (
             <Image source={{ uri: activeTrack.cover }} style={styles.artImg} />
@@ -144,6 +153,7 @@ export default function MiniPlayer() {
           </Text>
         )}
 
+        {/* controls transitions previous play next */}
         <IconButton onPress={() => setTransitionsEnabled(!transitionsEnabled)} label="Toggle transitions">
           {/* Ionicons et pas MaterialCommunityIcons : cette seule icône faisait
               télécharger 1,3 Mo de police alors qu'Ionicons est déjà chargé */}
@@ -167,6 +177,7 @@ export default function MiniPlayer() {
           <Ionicons name="play-skip-forward" size={20} color={hasNext ? colors.textPrimary : colors.textTertiary} />
         </IconButton>
 
+        {/* volume mute button + slider */}
         <View style={styles.volumeGroup}>
           <IconButton onPress={() => setVolume(volume > 0 ? 0 : 1)} label={volume > 0 ? "Mute" : "Unmute"}>
             <Ionicons
@@ -199,6 +210,7 @@ const styles = StyleSheet.create({
     boxShadow: "0 -4px 12px rgba(0,0,0,0.35)",
   },
   row: {
+    // 1 = the border top
     height: MINI_PLAYER_HEIGHT - 1,
     flexDirection: "row",
     alignItems: "center",
@@ -268,6 +280,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: colors.accent,
+    // half of the thumb width so it stay centered on the value
     marginLeft: -6,
   },
 });

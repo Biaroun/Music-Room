@@ -20,8 +20,10 @@ import { Inject } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import {ConfigService} from "@nestjs/config";
 
+// google link ticket live 5 min
 const GOOGLE_LINK_TICKET_TTL_MS = 5 * 60_000;
 
+// all the auth logic (register login logout google reset password)
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -32,6 +34,7 @@ export class AuthService {
               private config: ConfigService,
               @Inject(CACHE_MANAGER) private cacheManager: Cache,) {}
 
+  // create the account send the verification mail and return a jwt
   async register(data: RegisterDto): Promise<{ access_token: string }> {
     if (await this.usersService.isAlreadyExist('email', data.email)) {
       throw new ConflictException('Email already exists');
@@ -39,7 +42,9 @@ export class AuthService {
     if (await this.usersService.isAlreadyExist('username', data.username)) {
       throw new ConflictException('Username already exists');
     }
+    // 10 = bcrypt salt rounds
     const hashedPassword = await bcrypt.hash(data.password, 10);
+    // on vire passwordConfirm (not a column)
     const { passwordConfirm, ...userData} = data;
     const user = await this.usersService.create({
       ...userData,
@@ -61,7 +66,9 @@ export class AuthService {
     };
   }
 
+  // login with email or username then return a jwt
   async login(data: LoginDto): Promise<{ access_token: string }> {
+    // a @ in the login = its an email (usernames cant have one)
     const isEmail = data.login.includes('@');
 
     let user;
@@ -83,8 +90,10 @@ export class AuthService {
     };
   }
 
+  // put the token in the redis blacklist until it expire
   async logout(token: string): Promise<void> {
     const payload = this.jwtservice.decode(token) as { exp: number };
+    // seconds left before exp (exp is in seconds not ms)
     const ttl = payload.exp - Math.floor(Date.now() / 1000);
 
     if (ttl > 0) {
@@ -129,9 +138,11 @@ export class AuthService {
     return { ticket };
   }
 
+  // link the google account to the user who asked the ticket
   async linkGoogle(ticket: string, identity: GoogleIdentity): Promise<void> {
     const key = `google-link:${ticket}`;
     const userId = await this.cacheManager.get<number>(key);
+    // delete right away so the ticket is single use
     await this.cacheManager.del(key);
     if (!userId)
       throw new BadRequestException('Link request expired, start again from the app');
@@ -146,6 +157,7 @@ export class AuthService {
     await this.usersService.attachGoogle(user, identity);
   }
 
+  // remove the google link from the account
   async unlinkGoogle(userId: number): Promise<{ message: string }> {
     const user = await this.usersService.findById(userId);
     if (!user)
@@ -157,6 +169,7 @@ export class AuthService {
     return { message: 'Google account unlinked' };
   }
 
+  // check the google id token from the mobile app and extract the identity
   async verifyGoogleToken(token: string): Promise<GoogleIdentity> {
     const client = new OAuth2Client();
 
@@ -188,12 +201,15 @@ export class AuthService {
     return {
       googleId: payload.sub,
       email: payload.email,
+      // no name on google = on prend the part before the @
       username: payload.name ?? payload.email.split('@')[0],
     };
   }
 
+  // send a reset mail if the account exist (same answer in both case)
   async forgot_password(email: string) {
     const user = await this.usersService.findByEmail(email);
+    // unknown email = same message so we dont leak who has an account
     if (!user) {
       return { message: 'If this email exists, a reset link has been sent' };
     }
@@ -204,6 +220,7 @@ export class AuthService {
     return { message: 'If this email exists, a reset link has been sent' };
   }
 
+  // send a new verification mail (503 if the mail cant go)
   async resendVerification(userId: number): Promise<{ message: string }> {
     const user = await this.usersService.findById(userId);
     if (!user)
@@ -221,6 +238,7 @@ export class AuthService {
     return { message: 'Verification email sent' };
   }
 
+  // change the password with the token from the mail
   async resetPassword(token: string, newPassword: string) {
     const success = await this.usersService.verifyPasswordResetToken(token, newPassword);
     if (!success) {

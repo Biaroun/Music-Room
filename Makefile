@@ -13,8 +13,11 @@ start:
 
 stop:
 	docker compose down
-	@pkill -f "expo start" 2>/dev/null || true
-	@pkill -f "nest start" 2>/dev/null || true
+	@# les crochets evitent que pkill tue le shell de make qui contient aussi le motif
+	@pkill -f "[e]xpo start" 2>/dev/null || true
+	@pkill -f "[n]est start" 2>/dev/null || true
+	@# nest --watch lance le serveur dans un process a part qui survit sinon et garde le port 3000
+	@pkill -f "[b]ackend/dist/main" 2>/dev/null || true
 
 re: stop start
 

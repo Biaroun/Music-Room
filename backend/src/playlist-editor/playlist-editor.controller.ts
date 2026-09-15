@@ -23,18 +23,21 @@ export class PlaylistEditorController {
         private readonly gateway: PlaylistEditorGateway,
     ) {}
 
+    // POST create a playlist
     @ApiOperation({ summary: 'Create a playlist' })
     @Post()
     create(@CurrentUser() user: { id: number }, @Body() dto: CreatePlaylistDto) {
         return this.service.create(user.id, dto);
     }
 
+    // GET my playlists (owned + shared)
     @ApiOperation({ summary: 'List the playlists I own or co-edit' })
     @Get()
     findMine(@CurrentUser() user: { id: number }) {
         return this.service.findMine(user.id);
     }
 
+    // GET one playlist
     @ApiOperation({ summary: 'Get a playlist with its tracks' })
     @ApiResponse({ status: 403, description: 'Playlist is private and you are neither owner nor editor' })
     @ApiResponse({ status: 404, description: 'Playlist not found' })
@@ -43,6 +46,7 @@ export class PlaylistEditorController {
         return this.service.findOne(id, user.id);
     }
 
+    // PATCH update the playlist then broadcast
     @ApiOperation({ summary: 'Rename or change visibility of a playlist' })
     @Patch(':id')
     async update(
@@ -55,12 +59,14 @@ export class PlaylistEditorController {
         return playlist;
     }
 
+    // DELETE the playlist
     @ApiOperation({ summary: 'Delete a playlist' })
     @Delete(':id')
     remove(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number) {
         return this.service.remove(id, user.id);
     }
 
+    // POST add a track then broadcast
     @ApiOperation({ summary: 'Add a Deezer track to a playlist' })
     @Post(':id/tracks')
     async addTrack(
@@ -73,6 +79,7 @@ export class PlaylistEditorController {
         return track;
     }
 
+    // DELETE a track then broadcast
     @ApiOperation({ summary: 'Remove a track from a playlist' })
     @Delete(':id/tracks/:trackId')
     async removeTrack(
@@ -84,6 +91,7 @@ export class PlaylistEditorController {
         await this.gateway.broadcastState(id);
     }
 
+    // PATCH reorder then broadcast (409 if the version is old)
     @ApiOperation({ summary: 'Reorder the tracks of a playlist' })
     @ApiResponse({ status: 409, description: 'Playlist changed while you were reordering' })
     @Patch(':id/tracks/reorder')
@@ -97,12 +105,14 @@ export class PlaylistEditorController {
         return state;
     }
 
+    // GET the editors
     @ApiOperation({ summary: 'List the editors of a playlist' })
     @Get(':id/collaborators')
     listCollaborators(@CurrentUser() user: { id: number }, @Param('id', ParseIntPipe) id: number) {
         return this.service.listCollaborators(id, user.id);
     }
 
+    // POST invite an editor
     @ApiOperation({ summary: 'Grant edit rights on a playlist to another user' })
     @ApiResponse({ status: 403, description: 'Only the owner can invite editors' })
     @Post(':id/collaborators')
@@ -114,6 +124,7 @@ export class PlaylistEditorController {
         return this.service.addCollaborator(id, user.id, dto.userId);
     }
 
+    // DELETE remove an editor
     @ApiOperation({ summary: 'Revoke edit rights' })
     @Delete(':id/collaborators/:userId')
     removeCollaborator(

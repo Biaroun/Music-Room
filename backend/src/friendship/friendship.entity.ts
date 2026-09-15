@@ -1,6 +1,7 @@
 import {Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn} from "typeorm";
 import {User} from "../users/user.entity";
 
+// status of a relation between 2 users
 export enum FriendshipStatus {
     PENDING = 'pending',
     ACCEPTED = 'accepted',
@@ -8,6 +9,7 @@ export enum FriendshipStatus {
 }
 
 
+// one row = one relation (requester ask receiver or requester block receiver)
 @Entity()
 export class Friendship {
     @PrimaryGeneratedColumn()

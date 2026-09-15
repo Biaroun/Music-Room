@@ -6,6 +6,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 
+// passport strategy that read the bearer token
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     constructor(
@@ -15,10 +16,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             secretOrKey: config.get<string>('JWT_SECRET')!,
+            // we need req in validate to get the raw token
             passReqToCallback: true,
         });
     }
 
+    // refuse the token if its blacklisted (logout) sinon put id + username in req user
     async validate(req: any, payload: { sub: number; username: string }) {
         const token = req.headers.authorization?.split(' ')[1];
 

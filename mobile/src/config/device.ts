@@ -25,10 +25,12 @@ function deviceLabel(): string {
     return Device.modelName ?? Device.deviceName ?? 'unknown';
 }
 
+// app version from app json
 function appVersion(): string {
     return Constants.expoConfig?.version ?? 'unknown';
 }
 
+// the 3 values computed once at startup
 export const DEVICE_CONTEXT = {
     platform: platformLabel(),
     device: deviceLabel(),

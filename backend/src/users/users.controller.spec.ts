@@ -1,3 +1,4 @@
+// TL;DR test that the users controller always send the avatar and hide private fields
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';

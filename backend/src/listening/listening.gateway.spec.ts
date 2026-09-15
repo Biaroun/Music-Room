@@ -1,3 +1,4 @@
+// TL;DR test the listening gateway (snapshot on connect no token = kick update before auth end)
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';

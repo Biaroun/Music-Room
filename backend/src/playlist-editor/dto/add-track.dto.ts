@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
+// body to add a deezer track (same fields as PlaylistTrack)
 export class AddTrackDto {
     @ApiProperty({ description: "L'id du morceau chez Deezer" })
     @IsString()

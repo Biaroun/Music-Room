@@ -18,9 +18,11 @@ import { EventService } from './event.service';
 import { Board, TrackVoteService } from './track-vote.service';
 import { CastVoteDto } from './dto/cast-vote.dto';
 
+// socket with the user set after auth
 type AuthedSocket = Socket & { data: { userId: number; username: string } };
 type Timer = ReturnType<typeof setTimeout>;
 
+// room name of an event
 export function eventRoomOf(eventId: number): string {
     return `event:${eventId}`;
 }
@@ -53,6 +55,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         @Inject(CACHE_MANAGER) private cache: Cache,
     ) {}
 
+    // kick the socket if the token is bad
     async handleConnection(client: AuthedSocket) {
         if (!(await this.authenticate(client))) client.disconnect(true);
     }
@@ -89,6 +92,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         return this.authenticate(client);
     }
 
+    // join the event room send my board and start the ticker
     @SubscribeMessage('event:join')
     async onJoin(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { eventId: number }) {
         const userId = await this.resolveUserId(client);
@@ -105,16 +109,19 @@ export class TrackVoteGateway implements OnGatewayConnection {
         this.scheduleTick(dto.eventId, board);
     }
 
+    // leave the event room
     @SubscribeMessage('event:leave')
     async onLeave(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: { eventId: number }) {
         await client.leave(eventRoomOf(dto.eventId));
     }
 
+    // vote then send the new boards to the room
     @SubscribeMessage('vote:cast')
     async onCastVote(@ConnectedSocket() client: AuthedSocket, @MessageBody() dto: CastVoteDto & { eventId: number }) {
         const userId = await this.resolveUserId(client);
         if (!userId) return;
         try {
+            // position only if both coords are here (sinon undefined)
             const position =
                 dto.latitude != null && dto.longitude != null
                     ? { latitude: dto.latitude, longitude: dto.longitude }
@@ -128,6 +135,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         await this.broadcastBoard(dto.eventId);
     }
 
+    // retract a vote then send the new boards
     @SubscribeMessage('vote:retract')
     async onRetractVote(
         @ConnectedSocket() client: AuthedSocket,
@@ -167,6 +175,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
                 socket.emit('vote:board', board);
             }),
         );
+        // room empty = on coupe the ticker
         if (sockets.length > 0 && lastBoard) this.scheduleTick(eventId, lastBoard);
         else this.clearTick(eventId);
     }
@@ -181,6 +190,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         if (!board.nowPlaying) return;
 
         const remaining = board.nowPlaying.startedAt + board.nowPlaying.durationMs - Date.now();
+        // +500ms so the track is really over when we tick
         const delay = Math.max(remaining, 0) + 500;
         const timer = setTimeout(() => {
             this.tickers.delete(eventId);
@@ -189,6 +199,7 @@ export class TrackVoteGateway implements OnGatewayConnection {
         this.tickers.set(eventId, timer);
     }
 
+    // stop the ticker of this event if there is one
     private clearTick(eventId: number) {
         const existing = this.tickers.get(eventId);
         if (existing) {
@@ -197,10 +208,12 @@ export class TrackVoteGateway implements OnGatewayConnection {
         }
     }
 
+    // token from handshake auth sinon from the Bearer header
     private extractToken(client: Socket): string | null {
         const fromAuth = client.handshake.auth?.token;
         if (typeof fromAuth === 'string' && fromAuth) return fromAuth;
         const header = client.handshake.headers?.authorization;
+        // 7 = length of Bearer + the space
         if (typeof header === 'string' && header.startsWith('Bearer ')) return header.slice(7);
         return null;
     }

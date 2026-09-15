@@ -1,3 +1,4 @@
+// TL;DR test the html reset password page and form (valid expired XSS escape dto rules)
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';

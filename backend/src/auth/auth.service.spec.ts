@@ -1,3 +1,4 @@
+// TL;DR test auth service (smtp down dont break login google login link unlink resend mail)
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';

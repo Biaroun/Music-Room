@@ -13,12 +13,14 @@ export function throttleAllowlist(raw: string | undefined): string[] {
         .filter(Boolean);
 }
 
+// true if the client ip is in the allowlist (http only)
 export function isAllowlisted(context: ExecutionContext, allowlist: string[]): boolean {
     if (!allowlist.length || context.getType() !== 'http') return false;
     const request = context.switchToHttp().getRequest();
     const forwarded = request?.headers?.['x-forwarded-for'];
     const ip =
         typeof forwarded === 'string' && forwarded
+            // the first ip of x forwarded for = the real client
             ? forwarded.split(',')[0].trim()
             : (request?.ip ?? request?.socket?.remoteAddress);
     // express rend les ipv4 en ::ffff:127.0.0.1 en dual-stack
@@ -34,6 +36,7 @@ export function isAllowlisted(context: ExecutionContext, allowlist: string[]): b
  */
 @Injectable()
 export class HttpThrottlerGuard extends ThrottlerGuard {
+    // on skip everything that is not http (websockets)
     async canActivate(context: ExecutionContext): Promise<boolean> {
         if (context.getType() !== 'http') return true;
         return super.canActivate(context);
@@ -45,6 +48,7 @@ export class HttpThrottlerGuard extends ThrottlerGuard {
      */
     protected getTracker(req: Record<string, any>): Promise<string> {
         const forwarded = req.headers?.['x-forwarded-for'];
+        // first ip of the list = the client (the rest are proxies)
         if (typeof forwarded === 'string' && forwarded) return Promise.resolve(forwarded.split(',')[0].trim());
         return Promise.resolve(req.ip ?? req.socket?.remoteAddress ?? 'unknown');
     }

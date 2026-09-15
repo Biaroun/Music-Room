@@ -16,8 +16,10 @@ export default function ServerSettingsScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
 
+  // null while the input is not a valid url (buttons disabled)
   const url = normalizeApiUrl(input);
 
+  // just check if our api answer at this url
   async function test() {
     if (!url) return;
     setTesting(true);
@@ -39,12 +41,14 @@ export default function ServerSettingsScreen({ navigation }: any) {
       showToast({ type: 'error', message: 'No Music Room API at this address' });
       return;
     }
+    // same as the build url = on stocke null (so a new build url still apply)
     await setApiUrl(url === BUILD_API_URL ? null : url);
     setSaving(false);
     showToast({ type: 'success', message: `Server set to ${url}` });
     navigation.goBack();
   }
 
+  // back to the build url
   async function reset() {
     await setApiUrl(null);
     setInput(BUILD_API_URL);
@@ -63,6 +67,7 @@ export default function ServerSettingsScreen({ navigation }: any) {
         </Text>
       </View>
 
+      {/* url field then save test and reset buttons */}
       <Field
         label="Backend URL"
         placeholder="http://192.168.1.10:3000"

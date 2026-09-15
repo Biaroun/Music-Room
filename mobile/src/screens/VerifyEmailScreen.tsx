@@ -26,6 +26,7 @@ export default function VerifyEmailScreen() {
     return () => sub.remove();
   }, [token]);
 
+  // reload the account and say it if still not verified
   async function check() {
     setChecking(true);
     const next = await refreshAccount();
@@ -34,6 +35,7 @@ export default function VerifyEmailScreen() {
       showToast({ type: 'error', message: 'Pas encore validé : clique sur le lien reçu par mail.' });
   }
 
+  // ask a new verification mail (429 = too many tries)
   async function resend() {
     setSending(true);
     try {
@@ -63,6 +65,7 @@ export default function VerifyEmailScreen() {
         </Text>
       </View>
 
+      {/* check resend and logout buttons */}
       <Button title="J'ai validé mon email" icon="checkmark-circle-outline" onPress={check} loading={checking} />
       <Button
         title="Renvoyer le mail"

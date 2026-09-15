@@ -26,6 +26,7 @@ import {
 } from '../lib/trackVote';
 import { listMyPlaylists, type ApiPlaylist } from '../lib/playlists';
 
+// event now playing to a player track
 function nowPlayingToPreviewTrack(np: VoteNowPlaying): PreviewTrack {
   return { id: String(np.trackId), title: np.title, artist: np.artist, cover: np.cover, previewUrl: np.previewUrl };
 }
@@ -33,6 +34,7 @@ function nowPlayingToPreviewTrack(np: VoteNowPlaying): PreviewTrack {
 // repli rest tant que le websocket ne passe pas (meme seuil que RealtimeContext).
 const FALLBACK_POLL_MS = 20_000;
 
+// vote screen of an event (board now playing suggest import settings for the owner)
 export default function TrackVoteScreen({ route, navigation }: any) {
   const eventId: number = route.params.eventId;
   const { token } = useAuth();
@@ -43,11 +45,13 @@ export default function TrackVoteScreen({ route, navigation }: any) {
   const [event, setEvent] = useState<ApiEvent | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(true);
+  // trackId being voted right now (spinner on that row)
   const [voting, setVoting] = useState<number | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [playlistPickerVisible, setPlaylistPickerVisible] = useState(false);
   const [myPlaylists, setMyPlaylists] = useState<ApiPlaylist[]>([]);
   const [importing, setImporting] = useState(false);
+  // permission refused once = on redemande pas at each vote
   const locationDeniedRef = useRef(false);
 
   // lecture partagee : une fois qu'on a rejoint, chaque changement de morceau
@@ -55,9 +59,11 @@ export default function TrackVoteScreen({ route, navigation }: any) {
   // (meme lecteur que TrackSearch/PlaylistEditor, visible dans le MiniPlayer).
   const [listeningAlong, setListeningAlong] = useState(false);
   const { activeTrack, isPlaying, toggle: togglePlayback } = usePreviewPlayer();
+  // last now playing track we started (so we dont restart the same one)
   const lastAutoPlayedIdRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // settings gear in the header only for the owner
     navigation.setOptions({
       headerRight: event?.isOwner
         ? () => (
@@ -69,6 +75,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     });
   }, [navigation, event?.isOwner]);
 
+  // on focus load event + board and join the room (leave the room on blur)
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -124,6 +131,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }
   }
 
+  // gps position only for geo time events (undefined if denied or error)
   async function resolvePosition(): Promise<{ latitude: number; longitude: number } | undefined> {
     if (event?.licenseMode !== 'geo-time-restricted') return undefined;
     if (locationDeniedRef.current) return undefined;
@@ -150,6 +158,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     setVoting(track.trackId);
     try {
       const position = await resolvePosition();
+      // geo event without position = the vote would fail anyway
       if (event?.licenseMode === 'geo-time-restricted' && !position) return;
 
       if (connected) {
@@ -168,6 +177,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }
   }
 
+  // suggest a deezer track then reload the board
   async function suggest(track: DeezerTrack) {
     try {
       await suggestTrack(eventId, token, {
@@ -187,6 +197,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }
   }
 
+  // load my playlists and open the import picker
   async function openPlaylistPicker() {
     try {
       const playlists = await listMyPlaylists(token);
@@ -201,6 +212,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
     }
   }
 
+  // import a playlist in the event then reload the board
   async function importFromPlaylist(playlist: ApiPlaylist) {
     setImporting(true);
     try {
@@ -237,6 +249,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
         contentContainerStyle={[styles.list, { paddingBottom: bottomInset + spacing.xl }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
+          // header name status now playing suggest box
           <View style={styles.header}>
             <Text style={typography.h1}>{event?.name ?? 'Track Vote'}</Text>
             <Text style={styles.subtitle}>
@@ -251,6 +264,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
                 onJoin={joinListening}
               />
             )}
+            {/* suggest a track (search or add a whole playlist) */}
             <View style={styles.suggestBox}>
               <View style={styles.suggestTitleRow}>
                 <Text style={styles.suggestTitle}>Suggest a track</Text>
@@ -274,6 +288,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
             message="Suggest the first track above to start the vote."
           />
         }
+        // one vote row per track (rank = index + 1)
         renderItem={({ item, index }) => (
           <VoteRow
             rank={index + 1}
@@ -285,6 +300,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
         )}
       />
 
+      {/* settings modal (owner only) */}
       {event?.isOwner && (
         <EventSettingsModal
           visible={settingsVisible}
@@ -299,6 +315,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
         />
       )}
 
+      {/* playlist picker to import (tap outside = close) */}
       <Modal
         visible={playlistPickerVisible}
         transparent
@@ -335,6 +352,7 @@ export default function TrackVoteScreen({ route, navigation }: any) {
   );
 }
 
+// banner with my role and why I can or cant vote
 function StatusBanner({ event }: { event: ApiEvent }) {
   const roleLabel = event.isOwner
     ? { icon: 'star' as const, text: 'You created this event', color: colors.accent }
@@ -352,6 +370,7 @@ function StatusBanner({ event }: { event: ApiEvent }) {
       ? 'Your location will be checked when you vote'
       : null;
 
+  // nothing to say = no banner
   if (!roleLabel && !voteHint) return null;
 
   return (
@@ -376,6 +395,7 @@ function StatusBanner({ event }: { event: ApiEvent }) {
   );
 }
 
+// card of the track playing now + listen button + progress bar
 function NowPlayingCard({
   nowPlaying,
   listeningAlong,
@@ -395,6 +415,7 @@ function NowPlayingCard({
       setProgress(Math.max(0, Math.min(1, elapsed / nowPlaying.durationMs)));
     }
     tick();
+    // refresh the progress 4 times per second
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
   }, [nowPlaying.trackId, nowPlaying.startedAt, nowPlaying.durationMs]);
@@ -433,6 +454,7 @@ function NowPlayingCard({
   );
 }
 
+// one row of the board (rank cover title vote arrow + count)
 function VoteRow({
   rank,
   track,

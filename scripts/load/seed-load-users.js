@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { markEmailVerified } = require('../lib/mark-email-verified');
 
 const OUTPUT_FILE = path.join(__dirname, 'load-users.json');
 
@@ -89,20 +90,11 @@ async function createUser(apiUrl, index) {
             body: { username, email, password, passwordConfirm: password },
         }),
     );
-    // bug backend connu (cf. memoire projet) : /auth/register cree bien le user
-    // puis renvoie 500 si Mailtrap rate-limite l'envoi. Le login qui suit
-    // tranche pour de bon.
-    if (registered.status >= 400 && registered.status !== 500) {
+    if (!registered.data?.access_token) {
         throw new Error(`register ${username} a echoue (${registered.status}) : ${JSON.stringify(registered.data)}`);
     }
-
-    const loggedIn = await withRetryOn429(`login ${username}`, () =>
-        api(apiUrl, '/auth/login', { method: 'POST', body: { login: email, password } }),
-    );
-    if (!loggedIn.data?.access_token) {
-        throw new Error(`login ${username} a echoue (${loggedIn.status}) : ${JSON.stringify(loggedIn.data)}`);
-    }
-    const token = loggedIn.data.access_token;
+    const token = registered.data.access_token;
+    markEmailVerified(email);
 
     // une playlist par utilisateur : le scenario de lecture a besoin d'un id
     // reel, et le scenario d'ecriture d'une cible qui lui appartient.

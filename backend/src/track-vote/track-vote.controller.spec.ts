@@ -1,3 +1,4 @@
+// TL;DR test that the track vote controller check the rights and broadcast after a vote
 import { Test, TestingModule } from '@nestjs/testing';
 import { TrackVoteController } from './track-vote.controller';
 import { EventService } from './event.service';

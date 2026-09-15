@@ -16,6 +16,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
+  // POST forgot password with the email then go back
   async function handleSubmit() {
     if (!email.trim())
       return;
@@ -50,6 +51,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
         </Text>
       </View>
 
+      {/* email field + send and back buttons */}
       <Field
         label="Email"
         placeholder="you@example.com"

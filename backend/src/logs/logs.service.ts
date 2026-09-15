@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Log, LogChannel } from './log.entity';
 import type { ClientContext } from './client-context';
 
+// everything we need to write one log
 export type LogEntry = ClientContext & {
     channel: LogChannel;
     action: string;
@@ -16,6 +17,7 @@ export type LogEntry = ClientContext & {
     ip?: string | null;
 };
 
+// write the logs in postgres and in the console
 @Injectable()
 export class LogsService {
     private readonly logger = new Logger('HTTP');
@@ -29,6 +31,7 @@ export class LogsService {
      */
     record(entry: LogEntry): void {
         this.print(entry);
+        // no await on purpose (fire and forget)
         this.logs
             .insert({
                 channel: entry.channel,
@@ -49,6 +52,7 @@ export class LogsService {
             });
     }
 
+    // pretty console line (green arrow if ok cross if error)
     private print(entry: LogEntry): void {
         const who = entry.username ? `[user: ${entry.username}]` : '[anonymous]';
         // le triplet v.6, ou '-' quand l'appelant n'est pas l'app mobile

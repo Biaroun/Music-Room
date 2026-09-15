@@ -4,6 +4,7 @@ import {Repository} from "typeorm";
 import {Friendship, FriendshipStatus} from "./friendship.entity";
 import {User} from "../users/user.entity";
 
+// all the friend logic (requests friends blocks)
 @Injectable()
 export class FriendshipService {
 
@@ -12,6 +13,7 @@ export class FriendshipService {
         private friendshipRepository: Repository<Friendship>
     ) {}
 
+    // find any relation between A and B (in both directions any status)
     async isFriendshipExist(userAId: number, userBId: number): Promise<Friendship | null> {
         return await this.friendshipRepository.findOne({
             where: [
@@ -22,6 +24,7 @@ export class FriendshipService {
         });
     }
 
+    // true only if the relation is accepted
     async areFriends(userAId: number, userBId: number): Promise<boolean> {
         const relation = await this.friendshipRepository.findOne({
             where: [
@@ -31,6 +34,7 @@ export class FriendshipService {
         });
         return !!relation;
     }
+    // same as isFriendshipExist but with a given status
     async isRelationExist(userAId: number, userBId: number, status: FriendshipStatus): Promise<Friendship | null> {
         return await this.friendshipRepository.findOne({
             where: [
@@ -41,6 +45,7 @@ export class FriendshipService {
         });
     }
 
+    // send a request (or accept it if the other one already asked me)
     async sendRequest(requesterId: number, receiverId: number): Promise<Friendship> {
 
         let relation = await this.isFriendshipExist(requesterId, receiverId);
@@ -54,6 +59,7 @@ export class FriendshipService {
             }
 
             if (relation.status === FriendshipStatus.PENDING ) {
+                // im not the receiver = I already sent it (sinon cross request = auto accept)
                 if (requesterId !== relation.receiver.id)
                     throw new ConflictException('Friend request already sent');
                 else
@@ -68,6 +74,7 @@ export class FriendshipService {
 
         await this.friendshipRepository.save(relation);
 
+        // reload with the relations (save dont give back the users)
         const saved = await this.friendshipRepository.findOne({
             where: { id: relation.id },
             relations: ['requester', 'receiver'],
@@ -80,6 +87,7 @@ export class FriendshipService {
         return saved;
     }
 
+    // accept a pending request (only the receiver can)
     async acceptRequest(requestId: number, receiverId: number): Promise<Friendship> {
         const relation = await this.friendshipRepository.findOne({
             where: { id: requestId, receiver: { id: receiverId }, status: FriendshipStatus.PENDING },
@@ -94,6 +102,7 @@ export class FriendshipService {
 
     }
 
+    // reject = delete the pending request
     async rejectRequest(requestId: number, receiverId: number): Promise<void> {
         const relation = await this.friendshipRepository.findOne({
             where: { id: requestId, receiver: { id: receiverId }, status: FriendshipStatus.PENDING },
@@ -107,6 +116,7 @@ export class FriendshipService {
         return;
     }
 
+    // the pending requests I sent
     async getSentPendingRequests(requesterId: number): Promise<Friendship[]> {
         return await this.friendshipRepository.find({
             where: { requester: { id: requesterId }, status: FriendshipStatus.PENDING },
@@ -114,6 +124,7 @@ export class FriendshipService {
         });
     }
 
+    // cancel a request I sent (delete it)
     async cancelSentRequest(requestId: number, requesterId: number): Promise<void> {
         const relation = await this.friendshipRepository.findOne({
             where: { id: requestId, requester: { id: requesterId }, status: FriendshipStatus.PENDING },
@@ -127,6 +138,7 @@ export class FriendshipService {
         return;
     }
 
+    // the pending requests I received
     async getPendingRequests(receiverId: number): Promise<Friendship[]> {
         return await this.friendshipRepository.find({
             where: { receiver: { id: receiverId }, status: FriendshipStatus.PENDING },
@@ -134,6 +146,7 @@ export class FriendshipService {
         });
     }
 
+    // all the accepted relations where im on one side
     async getFriends(userId: number): Promise<Friendship[]> {
         return await this.friendshipRepository.find({
             where: [
@@ -144,6 +157,7 @@ export class FriendshipService {
         });
     }
 
+    // the blocks I did AND the ones against me
     async getBlocks(userId: number): Promise<Friendship[]> {
         return await this.friendshipRepository.find({
             where: [
@@ -154,6 +168,7 @@ export class FriendshipService {
         });
     }
 
+    // block a user (on remplace the old relation by a blocked one)
     async blockUser(blockerId: number, targetId: number): Promise<Friendship> {
         const isblocked = await this.friendshipRepository.findOne({
             where: {
@@ -163,6 +178,7 @@ export class FriendshipService {
             }
         });
 
+        // if the target already blocked me we keep that block (sinon we delete the old relation)
         if (!isblocked) {
             const relation = await this.isFriendshipExist(blockerId, targetId);
 
@@ -191,6 +207,7 @@ export class FriendshipService {
         return saved;
     }
 
+    // remove a block (only the one who blocked can)
     async unblockUser(blockId: number, userId: number): Promise<void> {
         const block = await this.friendshipRepository.findOne({
             where: {

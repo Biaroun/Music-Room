@@ -9,6 +9,7 @@ import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddTrackDto } from './dto/add-track.dto';
 
+// small public info of an editor (no email no tokens)
 export type CollaboratorSummary = { id: number; username: string; avatar: string | null };
 
 /** etat complet diffuse a la room par PlaylistEditorGateway */
@@ -24,6 +25,7 @@ export type PlaylistState = {
     updatedAt: number;
 };
 
+// playlist logic (crud tracks editors reorder and the rights)
 @Injectable()
 export class PlaylistEditorService {
     constructor(
@@ -33,6 +35,7 @@ export class PlaylistEditorService {
         @InjectRepository(User) private users: Repository<User>,
     ) {}
 
+    // create a playlist (public by default)
     async create(ownerId: number, dto: CreatePlaylistDto) {
         const playlist = this.playlists.create({
             name: dto.name,
@@ -42,6 +45,7 @@ export class PlaylistEditorService {
         return this.playlists.save(playlist);
     }
 
+    // my playlists AND the ones where im an editor
     async findMine(userId: number) {
         // tracks charge juste pour le compteur affiche cote mobile
         const owned = await this.playlists.find({
@@ -55,6 +59,7 @@ export class PlaylistEditorService {
             relations: { playlist: true },
         });
         const sharedIds = rows.map((row) => row.playlist.id);
+        // no shared id = on skip the query (In([]) is useless)
         const shared = sharedIds.length
             ? await this.playlists.find({
                   where: { id: In(sharedIds) },
@@ -71,6 +76,7 @@ export class PlaylistEditorService {
         ];
     }
 
+    // one playlist with its tracks sorted by position
     async findOne(id: number, requesterId: number) {
         await this.assertCanView(id, requesterId);
         const playlist = await this.playlists.findOne({
@@ -83,12 +89,14 @@ export class PlaylistEditorService {
         return { ...playlist, isOwner: playlist.owner.id === requesterId };
     }
 
+    // load the playlist and throw if im not the owner
     private async findOwned(id: number, ownerId: number): Promise<Playlist> {
         const playlist = await this.load(id);
         if (playlist.owner.id !== ownerId) throw new ForbiddenException('Not your playlist');
         return playlist;
     }
 
+    // true if userId was invited as editor
     private isCollaborator(playlistId: number, userId: number): Promise<boolean> {
         return this.collaborators
             .findOne({ where: { playlist: { id: playlistId }, collaborator: { id: userId } } })
@@ -130,12 +138,14 @@ export class PlaylistEditorService {
         throw new ForbiddenException('This playlist is private');
     }
 
+    // rename or change visibility or license (owner only)
     async update(id: number, ownerId: number, dto: UpdatePlaylistDto) {
         const playlist = await this.findOwned(id, ownerId);
         Object.assign(playlist, dto);
         return this.playlists.save(playlist);
     }
 
+    // delete the playlist (owner only tracks go with the cascade)
     async remove(id: number, ownerId: number): Promise<void> {
         const playlist = await this.findOwned(id, ownerId);
         await this.playlists.remove(playlist);
@@ -168,6 +178,7 @@ export class PlaylistEditorService {
         };
     }
 
+    // editors of the playlist with only id username avatar
     private async collaboratorSummaries(playlistId: number): Promise<CollaboratorSummary[]> {
         const rows = await this.collaborators.find({
             where: { playlist: { id: playlistId } },
@@ -181,11 +192,13 @@ export class PlaylistEditorService {
         }));
     }
 
+    // editors list (need the view right)
     async listCollaborators(playlistId: number, userId: number): Promise<CollaboratorSummary[]> {
         await this.assertCanView(playlistId, userId);
         return this.collaboratorSummaries(playlistId);
     }
 
+    // invite an editor (owner only)
     async addCollaborator(playlistId: number, ownerId: number, userId: number) {
         await this.findOwned(playlistId, ownerId);
         if (userId === ownerId) throw new BadRequestException('The owner is already an editor');
@@ -208,15 +221,18 @@ export class PlaylistEditorService {
         );
     }
 
+    // remove an editor (owner only)
     async removeCollaborator(playlistId: number, ownerId: number, userId: number): Promise<void> {
         await this.findOwned(playlistId, ownerId);
         await this.collaborators.delete({ playlist: { id: playlistId }, collaborator: { id: userId } });
     }
 
+    // version + 1 after each change (for the reorder conflicts)
     private bumpVersion(playlistId: number) {
         return this.playlists.increment({ id: playlistId }, 'version', 1);
     }
 
+    // add a deezer track at the end of the playlist
     async addTrack(playlistId: number, userId: number, dto: AddTrackDto) {
         const playlist = await this.assertCanEdit(playlistId, userId);
 
@@ -228,6 +244,7 @@ export class PlaylistEditorService {
         });
         if (duplicate) throw new ConflictException('This track is already in the playlist');
 
+        // count = next position because positions start at 0
         const position = await this.tracks.count({ where: { playlist: { id: playlist.id } } });
         // juste l'id pour la relation, inutile de renvoyer toute la playlist
         const track = this.tracks.create({ ...dto, position, playlist: { id: playlist.id } as any });
@@ -236,6 +253,7 @@ export class PlaylistEditorService {
         return saved;
     }
 
+    // remove a track from the playlist
     async removeTrack(playlistId: number, trackId: number, userId: number): Promise<void> {
         await this.assertCanEdit(playlistId, userId);
         const track = await this.tracks.findOne({ where: { id: trackId, playlist: { id: playlistId } } });
@@ -254,6 +272,7 @@ export class PlaylistEditorService {
     async reorder(playlistId: number, userId: number, trackIds: number[], expectedVersion?: number) {
         await this.assertCanEdit(playlistId, userId);
 
+        // 1) check version 2) check same set of ids 3) write the new positions 4) version + 1
         await this.playlists.manager.transaction(async (em) => {
             const playlist = await em.findOne(Playlist, { where: { id: playlistId } });
             if (!playlist) throw new NotFoundException('Playlist not found');
@@ -262,6 +281,7 @@ export class PlaylistEditorService {
             }
 
             const currentTracks = await em.find(PlaylistTrack, { where: { playlist: { id: playlistId } } });
+            // sort both lists to compare the ids without the order
             const currentIds = currentTracks.map((t) => t.id).sort((a, b) => a - b);
             const requestedIds = [...trackIds].sort((a, b) => a - b);
             const sameSet =
@@ -271,6 +291,7 @@ export class PlaylistEditorService {
             }
 
             for (const [index, trackId] of trackIds.entries()) {
+                // the index in the array = the new position
                 await em.update(PlaylistTrack, trackId, { position: index });
             }
             await em.increment(Playlist, { id: playlistId }, 'version', 1);

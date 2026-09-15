@@ -2,6 +2,7 @@ import { apiFetch } from '../config/api';
 
 export type SubscriptionPlan = 'free' | 'premium';
 
+// what the api send back after a change
 export type SubscriptionStatus = {
   plan: SubscriptionPlan;
   subscribedAt: string | null;
@@ -14,6 +15,7 @@ export function subscribe(token: string | null): Promise<SubscriptionStatus> {
   return apiFetch('/subscription/subscribe', token, { method: 'POST' });
 }
 
+// back to the free plan
 export function cancelSubscription(token: string | null): Promise<SubscriptionStatus> {
   return apiFetch('/subscription/cancel', token, { method: 'POST' });
 }

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
+// send all the app mails (ethereal in dev real smtp sinon)
 @Injectable()
 export class MailService implements OnModuleInit {
     private transporter: nodemailer.Transporter;
@@ -17,6 +18,7 @@ export class MailService implements OnModuleInit {
 
     constructor(private config: ConfigService) {}
 
+    // build the transporter at startup (ethereal if no MAIL_HOST)
     async onModuleInit(): Promise<void> {
         const host = this.config.get<string>('MAIL_HOST');
         this.isEthereal = !host || host === 'ethereal';
@@ -33,6 +35,7 @@ export class MailService implements OnModuleInit {
 
             this.transporter = nodemailer.createTransport({
                 host: 'smtp.ethereal.email',
+                // 587 = smtp with starttls (secure false is normal)
                 port: 587,
                 secure: false,
                 auth: { user: account.user, pass: account.pass },
@@ -69,12 +72,14 @@ export class MailService implements OnModuleInit {
         );
     }
 
+    // mail with the verify link
     async sendVerificationEmail(to: string, token: string): Promise<void> {
         const baseUrl = this.config.get<string>('APP_URL');
         const verificationUrl = `${baseUrl}/auth/verify-email?token=${token}`;
         await this.send(to, 'Verify your email', `<p>Click <a href="${verificationUrl}">here</a> to verify your email.</p>`);
     }
 
+    // mail with the reset password link (15 min)
     async sendPasswordResetEmail(to: string, token: string): Promise<void> {
         const baseUrl = this.config.get<string>('APP_URL');
         const resetUrl = `${baseUrl}/auth/reset-password?token=${token}`;
@@ -90,6 +95,7 @@ export class MailService implements OnModuleInit {
         );
     }
 
+    // mail when premium is activated
     async sendSubscriptionConfirmedEmail(to: string): Promise<void> {
         await this.send(
             to,
@@ -101,6 +107,7 @@ export class MailService implements OnModuleInit {
         );
     }
 
+    // mail when premium is cancelled
     async sendSubscriptionCancelledEmail(to: string): Promise<void> {
         await this.send(
             to,

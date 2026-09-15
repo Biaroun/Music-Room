@@ -16,30 +16,36 @@ type ToastContextValue = {
   showToast: (opts: { type: ToastType; message: string }) => void;
 };
 
+// default no op so useToast dont crash outside the provider
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 
+// hook to show a toast from anywhere
 export function useToast() {
   return useContext(ToastContext);
 }
 
+// colors and icon per toast type
 const STYLE_BY_TYPE: Record<ToastType, { bg: string; fg: string; icon: React.ComponentProps<typeof Ionicons>['name'] }> = {
   success: { bg: colors.accent, fg: '#04150b', icon: 'checkmark-circle' },
   error: { bg: colors.danger, fg: '#2a0b0b', icon: 'alert-circle' },
   info: { bg: colors.surface, fg: colors.textPrimary, icon: 'information-circle' },
 };
 
+// one toast at a time on top of the app
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<ToastState>({ visible: false, type: 'success', message: '' });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
+  // show a toast and hide it after 3 5s (a new one replace the old one)
   function showToast({ type, message }: { type: ToastType; message: string }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     setToast({ visible: true, type, message });
     timerRef.current = setTimeout(dismiss, 3500);
   }
 
+  // hide the toast now
   function dismiss() {
     if (timerRef.current) clearTimeout(timerRef.current);
     setToast((t) => ({ ...t, visible: false }));
@@ -52,10 +58,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       toValue: toast.visible ? 1 : 0,
       duration: toast.visible ? 220 : 160,
       easing: toast.visible ? Easing.out(Easing.back(1.4)) : Easing.in(Easing.ease),
+      // native driver dont exist on web
       useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [toast.visible]);
 
+  // clear the timer on unmount (No leaks)
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const palette = STYLE_BY_TYPE[toast.type];
@@ -73,6 +81,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 { backgroundColor: palette.bg },
                 {
                   opacity: anim,
+                  // slide down from 24px above
                   transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] }) }],
                 },
               ]}

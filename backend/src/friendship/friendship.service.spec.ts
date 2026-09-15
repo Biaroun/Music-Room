@@ -1,3 +1,4 @@
+// TL;DR test the sent pending requests and cancel request in the friendship service
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';

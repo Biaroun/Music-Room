@@ -9,6 +9,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { haversineDistanceMeters } from './geo.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 
+// gps position of the voter
 export type VoterPosition = { latitude: number; longitude: number };
 
 // ce que le front doit savoir pour afficher un event sans deviner : suis-je
@@ -20,6 +21,7 @@ export type EventForUser = Event & {
     canVote: boolean;
 };
 
+// events crud invites and the view vote rights
 @Injectable()
 export class EventService {
     constructor(
@@ -40,6 +42,7 @@ export class EventService {
         }
     }
 
+    // create an event on a playlist (premium only)
     async create(ownerId: number, dto: CreateEventDto): Promise<Event> {
         await this.assertPremium(ownerId);
         const playlist = await this.playlists.findOne({ where: { id: dto.playlistId } });
@@ -72,6 +75,7 @@ export class EventService {
             where: [
                 { visibility: EventVisibility.PUBLIC },
                 { owner: { id: userId } },
+                // one OR condition per invited event
                 ...(invitedEventIds.size ? [...invitedEventIds].map((id) => ({ id })) : []),
             ],
             relations: { owner: true, playlist: true },
@@ -108,6 +112,7 @@ export class EventService {
         return true;
     }
 
+    // load an event with owner + playlist or 404 (no rights check)
     async findOne(id: number): Promise<Event> {
         const event = await this.events.findOne({
             where: { id },
@@ -118,6 +123,7 @@ export class EventService {
         return event;
     }
 
+    // load the event if im the owner AND still premium
     private async findManageable(id: number, ownerId: number): Promise<Event> {
         const event = await this.findOne(id);
         if (event.owner.id !== ownerId) throw new ForbiddenException('Not your event');
@@ -128,6 +134,7 @@ export class EventService {
         return event;
     }
 
+    // update an event (dates converted from string)
     async update(id: number, ownerId: number, dto: UpdateEventDto): Promise<Event> {
         const event = await this.findManageable(id, ownerId);
         Object.assign(event, {
@@ -138,11 +145,13 @@ export class EventService {
         return this.events.save(event);
     }
 
+    // delete an event
     async remove(id: number, ownerId: number): Promise<void> {
         const event = await this.findManageable(id, ownerId);
         await this.events.remove(event);
     }
 
+    // invite a user (already invited = on renvoie the same invite)
     async invite(eventId: number, ownerId: number, inviteeId: number): Promise<EventInvite> {
         await this.findManageable(eventId, ownerId);
         const existing = await this.invites.findOne({
@@ -157,16 +166,19 @@ export class EventService {
         return this.invites.save(invite);
     }
 
+    // remove an invite
     async uninvite(eventId: number, ownerId: number, inviteeId: number): Promise<void> {
         await this.findManageable(eventId, ownerId);
         await this.invites.delete({ event: { id: eventId }, invitee: { id: inviteeId } });
     }
 
+    // invites of an event (owner only)
     async listInvited(eventId: number, ownerId: number) {
         await this.findManageable(eventId, ownerId);
         return this.invites.find({ where: { event: { id: eventId } }, relations: { invitee: true } });
     }
 
+    // true if the user has an invite row
     private async isInvited(eventId: number, userId: number): Promise<boolean> {
         const invite = await this.invites.findOne({
             where: { event: { id: eventId }, invitee: { id: userId } },

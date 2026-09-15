@@ -18,6 +18,7 @@ const WS_MESSAGE_METADATA = 'message';
 export class LogsInterceptor implements NestInterceptor {
     constructor(private readonly logs: LogsService) {}
 
+    // send to the http or ws version (rpc not used so on skip)
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         const type = context.getType<'http' | 'ws' | 'rpc'>();
         if (type === 'http') return this.interceptHttp(context, next);
@@ -25,6 +26,7 @@ export class LogsInterceptor implements NestInterceptor {
         return next.handle();
     }
 
+    // log a successful http request with its duration
     private interceptHttp(context: ExecutionContext, next: CallHandler): Observable<any> {
         const request = context.switchToHttp().getRequest();
         const response = context.switchToHttp().getResponse();
@@ -55,9 +57,11 @@ export class LogsInterceptor implements NestInterceptor {
         );
     }
 
+    // log a ws message (success or error) with its duration
     private interceptWs(context: ExecutionContext, next: CallHandler): Observable<any> {
         const client = context.switchToWs().getClient<Socket>();
         const event =
+            // event name from @SubscribeMessage sinon Class + handler name
             Reflect.getMetadata(WS_MESSAGE_METADATA, context.getHandler()) ??
             `${context.getClass().name}.${context.getHandler().name}`;
         const device = clientContextFromSocket(client);

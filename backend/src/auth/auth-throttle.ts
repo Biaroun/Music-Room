@@ -10,6 +10,7 @@ import { Throttle } from '@nestjs/throttler';
  * docs/ramp-up.md.
  */
 export const AUTH_THROTTLE_TTL_MS = 60_000;
+// max 5 tries per window
 export const AUTH_THROTTLE_LIMIT = 5;
 
 /** 5 essais par minute et par ip, sur les routes qui verifient un secret */

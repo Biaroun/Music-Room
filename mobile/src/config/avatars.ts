@@ -6,6 +6,7 @@ import { ImageSourcePropType } from 'react-native';
 // et l'extension doit correspondre exactement au fichier (.jpg = .jpeg = .png).
 export type Avatar = { id: string; source: ImageSourcePropType };
 
+// the 8 avatars (same ids as the backend)
 export const AVATARS: Avatar[] = [
   { id: 'avatar-1', source: require('../../assets/avatars/avatar-1.jpg') },
   { id: 'avatar-2', source: require('../../assets/avatars/avatar-2.jpg') },
@@ -17,5 +18,6 @@ export const AVATARS: Avatar[] = [
   { id: 'avatar-8', source: require('../../assets/avatars/avatar-8.jpg') },
 ];
 
+// find an avatar by id (null if unknown or no avatar)
 export const getAvatar = (id?: string | null): Avatar | null =>
   AVATARS.find((a) => a.id === id) ?? null;

@@ -7,6 +7,7 @@ import { createServer } from 'net';
 // si le port est pris, on prend le suivant
 function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number> {
   return new Promise((resolve, reject) => {
+    // try to open a test server on port (sinon on retry with port + 1)
     const tryPort = (port: number, attemptsLeft: number) => {
       const tester = createServer();
       tester.once('error', (err: NodeJS.ErrnoException) => {
@@ -17,6 +18,7 @@ function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number>
           reject(err);
         }
       });
+      // port is free so we close the tester right away and give it back
       tester.once('listening', () => tester.close(() => resolve(port)));
       tester.listen(port, '0.0.0.0');
     };
@@ -24,6 +26,7 @@ function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number>
   });
 }
 
+// start the nest app (cors validation swagger then listen)
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -31,6 +34,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(
       new ValidationPipe({
+        // whitelist = drop the fields not in the dto
         whitelist: true,
         transform: true,
       }),
@@ -39,6 +43,7 @@ async function bootstrap() {
   // LogsInterceptor et AllExceptionsFilter sont poses dans LogsModule : ils
   // injectent LogsService, donc plus instanciables a la main ici
 
+  // swagger doc served on /api/docs
   const config = new DocumentBuilder()
       .setTitle('Music Room API')
       .setDescription('API de Music Room')
@@ -48,6 +53,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // 3000 by default if PORT is not set
   const desiredPort = Number(process.env.PORT) || 3000;
   const port = await findAvailablePort(desiredPort);
   if (port !== desiredPort) {

@@ -34,6 +34,7 @@ export default function ConfirmDialog({
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           <Text style={typography.h3}>{title}</Text>
           {message && <Text style={styles.message}>{message}</Text>}
+          {/* cancel and confirm buttons (red if destructive) */}
           <View style={styles.actions}>
             <Button title={cancelLabel} variant="secondary" onPress={onCancel} style={styles.action} />
             <Button

@@ -19,6 +19,7 @@ import {
   type InvitedUser,
 } from '../lib/trackVote';
 
+// a user from users search
 type SearchResult = { id: number; username: string };
 
 type Props = {
@@ -30,22 +31,26 @@ type Props = {
   onDeleted: () => void;
 };
 
+// choices for the visibility
 const VISIBILITY_OPTIONS: { value: EventVisibility; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { value: 'public', label: 'Public', icon: 'earth' },
   { value: 'private', label: 'Private', icon: 'lock-closed' },
 ];
 
+// choices for who can vote
 const LICENSE_OPTIONS: { value: EventLicenseMode; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { value: 'open', label: 'Everyone', icon: 'globe-outline' },
   { value: 'invite-only', label: 'Invited only', icon: 'people-outline' },
   { value: 'geo-time-restricted', label: 'Location & time', icon: 'location-outline' },
 ];
 
+// owner modal to edit an event (name visibility license geo invites delete)
 export default function EventSettingsModal({ visible, event, token, onClose, onUpdated, onDeleted }: Props) {
   const { showToast } = useToast();
   const [name, setName] = useState(event.name);
   const [visibility, setVisibility] = useState<EventVisibility>(event.visibility);
   const [licenseMode, setLicenseMode] = useState<EventLicenseMode>(event.licenseMode);
+  // 200m radius by default (string for the input)
   const [radiusMeters, setRadiusMeters] = useState(String(event.licenseRadiusMeters ?? 200));
   const [durationHours, setDurationHours] = useState('4');
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(
@@ -62,8 +67,10 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // invites only matter if private or invite only
   const needsInvites = visibility === 'private' || licenseMode === 'invite-only';
 
+  // each time the modal open reset the form on the event and load the invites
   useEffect(() => {
     if (!visible) return;
     setName(event.name);
@@ -75,9 +82,11 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
       .catch(() => {});
   }, [visible, event]);
 
+  // ask the permission and take the current gps position as event center
   async function useMyLocation() {
     setLocating(true);
     try {
+      // lazy import so the module only load when we need it
       const Location = await import('expo-location');
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -93,6 +102,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     }
   }
 
+  // check the form then PATCH the event (geo mode = window from now for x hours)
   async function save() {
     if (!name.trim()) {
       showToast({ type: 'error', message: 'Event name cannot be empty' });
@@ -105,6 +115,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     setSaving(true);
     try {
       const now = Date.now();
+      // bad input or 0 = 4 hours
       const hours = parseFloat(durationHours) || 4;
       const patch =
         licenseMode === 'geo-time-restricted'
@@ -116,6 +127,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
               licenseLongitude: position!.longitude,
               licenseRadiusMeters: parseInt(radiusMeters, 10) || 200,
               licenseStartsAt: new Date(now).toISOString(),
+              // 3600000 ms = 1 hour
               licenseEndsAt: new Date(now + hours * 3600_000).toISOString(),
             }
           : { name: name.trim(), visibility, licenseMode };
@@ -130,6 +142,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     }
   }
 
+  // search users to invite (empty query = clear the results)
   async function searchUsers(q: string) {
     setQuery(q);
     if (!q.trim()) {
@@ -147,6 +160,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     }
   }
 
+  // invite a user and move it from the results to the invited list
   async function invite(user: SearchResult) {
     try {
       await inviteToEvent(event.id, user.id, token);
@@ -157,6 +171,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     }
   }
 
+  // remove an invite
   async function uninvite(userId: number) {
     try {
       await uninviteFromEvent(event.id, userId, token);
@@ -166,6 +181,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
     }
   }
 
+  // delete the event after the confirm
   async function confirmDeleteEvent() {
     setConfirmDelete(false);
     try {
@@ -181,10 +197,12 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           <FlatList
+            // FlatList with one fake item = the modal content can scroll
             data={[1]}
             keyExtractor={() => 'settings'}
             renderItem={() => (
               <View>
+                {/* title + close */}
                 <View style={styles.titleRow}>
                   <Text style={typography.h3}>Event settings</Text>
                   <Pressable onPress={onClose} hitSlop={8}>
@@ -192,6 +210,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   </Pressable>
                 </View>
 
+                {/* name input */}
                 <Text style={styles.sectionLabel}>Event name</Text>
                 <TextInput
                   style={styles.searchInput}
@@ -202,6 +221,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   maxLength={255}
                 />
 
+                {/* visibility choice */}
                 <Text style={styles.sectionLabel}>Visibility</Text>
                 <View style={styles.optionRow}>
                   {VISIBILITY_OPTIONS.map((opt) => (
@@ -216,6 +236,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   ))}
                 </View>
 
+                {/* license choice */}
                 <Text style={styles.sectionLabel}>Who can vote</Text>
                 <View style={styles.optionRow}>
                   {LICENSE_OPTIONS.map((opt) => (
@@ -230,6 +251,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   ))}
                 </View>
 
+                {/* geo mode location radius and duration */}
                 {licenseMode === 'geo-time-restricted' && (
                   <View style={styles.geoBox}>
                     <Button
@@ -261,6 +283,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   </View>
                 )}
 
+                {/* invite search + invited list */}
                 {needsInvites && (
                   <View style={styles.inviteBox}>
                     <Text style={styles.sectionLabel}>Invited people</Text>
@@ -296,6 +319,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
                   </View>
                 )}
 
+                {/* save and delete */}
                 <Button title="Save" onPress={save} loading={saving} style={{ marginTop: spacing.lg }} />
                 <Button
                   title="Delete event"
@@ -310,6 +334,7 @@ export default function EventSettingsModal({ visible, event, token, onClose, onU
         </Pressable>
       </Pressable>
 
+      {/* delete confirm */}
       <ConfirmDialog
         visible={confirmDelete}
         title="Delete this event?"

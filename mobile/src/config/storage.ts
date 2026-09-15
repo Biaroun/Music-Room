@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 // expo-secure-store n'existe pas sur le web -> fallback localStorage.
 export const storage = {
+  // same api on both sides and always a promise
   getItem: (key: string): Promise<string | null> =>
     Platform.OS === 'web'
       ? Promise.resolve(globalThis.localStorage?.getItem(key) ?? null)

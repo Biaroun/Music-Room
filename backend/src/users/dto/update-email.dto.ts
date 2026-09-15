@@ -8,6 +8,7 @@ import {
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
+// body to change the email (new email + current password)
 export class UpdateEmailDto {
 
 

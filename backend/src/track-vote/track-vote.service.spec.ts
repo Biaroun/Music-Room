@@ -1,3 +1,4 @@
+// TL;DR test votes import board sort and the play queue (auto start advance no double advance)
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';

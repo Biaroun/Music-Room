@@ -29,6 +29,7 @@ export const colors = {
     overlay: 'rgba(0,0,0,0.6)',
 };
 
+// spacing scale in px
 export const spacing = {
     xs: 4,
     sm: 8,
@@ -38,6 +39,7 @@ export const spacing = {
     xxl: 48,
 };
 
+// border radius (pill 999 = full round)
 export const radius = {
     sm: 6,
     md: 10,
@@ -65,6 +67,7 @@ export const shadows = {
     floating: { boxShadow: '0 8px 16px rgba(0,0,0,0.4)' },
 } as const;
 
+// text styles (as const so ts accept the fontWeight)
 export const typography = {
     h1: { fontSize: 28, fontWeight: '800' as const, color: colors.textPrimary, letterSpacing: -0.6 },
     h2: { fontSize: 20, fontWeight: '700' as const, color: colors.textPrimary, letterSpacing: -0.3 },

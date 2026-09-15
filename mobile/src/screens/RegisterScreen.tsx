@@ -8,6 +8,7 @@ import Field from '../components/Field';
 import Button from '../components/Button';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 
+// register screen (username email password confirm)
 export default function RegisterScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -18,8 +19,10 @@ export default function RegisterScreen({ navigation }: any) {
 
   // retour immediat sur la confirmation : plus lisible qu'une erreur apres l'envoi.
   const mismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
+  // all fields filled AND the 2 passwords match
   const canSubmit = !!username && !!email && !!password && !!passwordConfirm && !mismatch;
 
+  // POST register then back to login (the mail link is sent by the back)
   async function handleRegister() {
     if (!canSubmit) return;
     setLoading(true);
@@ -44,6 +47,7 @@ export default function RegisterScreen({ navigation }: any) {
         <Text style={[typography.caption, { marginTop: spacing.xs }]}>Join Music Room in a few seconds</Text>
       </View>
 
+      {/* register form */}
       <Field label="Username" placeholder="dj_tom" value={username} onChangeText={setUsername} autoCapitalize="none" />
       <Field
         label="Email"
@@ -75,6 +79,7 @@ export default function RegisterScreen({ navigation }: any) {
 
       <GoogleSignInButton label="Sign up with Google" />
 
+      {/* link back to login */}
       <View style={styles.footer}>
         <Text style={typography.caption}>Already have an account? </Text>
         <Pressable onPress={() => navigation.goBack()}>

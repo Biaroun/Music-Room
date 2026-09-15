@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { EventLicenseMode, EventVisibility } from '../event.entity';
 
+// body to update an event (all optional)
 export class UpdateEventDto {
     @ApiProperty({ required: false })
     @IsOptional()

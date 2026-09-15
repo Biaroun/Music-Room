@@ -1,3 +1,4 @@
+// TL;DR test that the mail service can be built
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from './mail.service';

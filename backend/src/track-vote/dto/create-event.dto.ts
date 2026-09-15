@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { EventLicenseMode, EventVisibility } from '../event.entity';
 
+// body to create an event
 export class CreateEventDto {
     @ApiProperty({ example: 'Soiree du samedi' })
     @IsString()
@@ -37,6 +38,7 @@ export class CreateEventDto {
     licenseMode?: EventLicenseMode;
 
     @ApiProperty({ required: false, description: 'Requis si licenseMode = geo-time-restricted' })
+    // ValidateIf = the geo fields are checked only in geo time mode
     @ValidateIf((o) => o.licenseMode === EventLicenseMode.GEO_TIME_RESTRICTED)
     @IsLatitude()
     licenseLatitude?: number;

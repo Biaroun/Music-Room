@@ -2,17 +2,20 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGenerat
 import { User } from '../users/user.entity';
 import { Playlist } from '../playlist-editor/playlist.entity';
 
+// who can see the event
 export enum EventVisibility {
     PUBLIC = 'public',
     PRIVATE = 'private',
 }
 
+// who can vote (everybody invited only or in a zone and a time window)
 export enum EventLicenseMode {
     OPEN = 'open',
     INVITE_ONLY = 'invite-only',
     GEO_TIME_RESTRICTED = 'geo-time-restricted',
 }
 
+// a track vote event built on a playlist
 @Entity()
 export class Event {
     @PrimaryGeneratedColumn()
@@ -42,6 +45,7 @@ export class Event {
     @Column({ type: 'float', nullable: true })
     licenseLongitude: number | null;
 
+    // radius around the lat lng in meters
     @Column({ type: 'int', nullable: true })
     licenseRadiusMeters: number | null;
 

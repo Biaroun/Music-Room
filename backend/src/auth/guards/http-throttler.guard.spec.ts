@@ -1,3 +1,4 @@
+// TL;DR test the throttler guard (ws skip client ip allowlist) and that auth routes are limited
 import { ExecutionContext } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { HttpThrottlerGuard, isAllowlisted, throttleAllowlist } from './http-throttler.guard';

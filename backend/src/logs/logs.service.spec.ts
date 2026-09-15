@@ -1,3 +1,4 @@
+// TL;DR test that the logs service save the client info and never throw if the db fail
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { LogsService } from './logs.service';

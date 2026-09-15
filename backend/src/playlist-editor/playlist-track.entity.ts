@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Playlist } from './playlist.entity';
 
+// one track inside a playlist (or inside an event queue for track vote)
 @Entity()
 export class PlaylistTrack {
     @PrimaryGeneratedColumn()
@@ -22,6 +23,7 @@ export class PlaylistTrack {
     @Column({ nullable: true })
     cover: string;
 
+    // 30s mp3 preview from deezer
     @Column()
     previewUrl: string;
 

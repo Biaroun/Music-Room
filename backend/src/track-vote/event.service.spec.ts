@@ -1,3 +1,4 @@
+// TL;DR test event visibility vote license (invite geo time) and the premium gate
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';

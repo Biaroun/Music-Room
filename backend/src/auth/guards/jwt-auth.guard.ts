@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/user.entity';
 import { ALLOW_UNVERIFIED_KEY } from '../decorators/allow-unverified.decorator';
 
+// guard jwt + check that the email is verified
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
     constructor(
@@ -30,6 +31,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
             return true;
 
         const req = context.switchToHttp().getRequest();
+        // read the db each time (the jwt dont know if the mail got verified since)
         const user = await this.users.findOneBy({ id: req.user.id });
         if (!user?.emailisVerified)
             throw new ForbiddenException('Email not verified');

@@ -21,6 +21,7 @@ import { HttpThrottlerGuard, isAllowlisted, throttleAllowlist } from './auth/gua
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // postgres connection (synchronize true = tables built from the entities)
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -47,10 +48,12 @@ import { HttpThrottlerGuard, isAllowlisted, throttleAllowlist } from './auth/gua
               limit: Number(config.get('THROTTLE_LIMIT') ?? 300),
             },
           ],
+          // on skip the limit for the ips in the allowlist
           skipIf: (context) => isAllowlisted(context, allowlist),
         };
       },
     }),
+    // redis cache global (jwt blacklist tickets and co)
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
@@ -69,6 +72,8 @@ import { HttpThrottlerGuard, isAllowlisted, throttleAllowlist } from './auth/gua
     ListeningModule,
     SubscriptionModule,
   ],
+  // the throttler guard on every http route
   providers: [{ provide: APP_GUARD, useClass: HttpThrottlerGuard }],
 })
+// root module that plug all the feature modules together
 export class AppModule {}

@@ -9,6 +9,7 @@ import {UpdatePasswordDto} from "./dto/update-password.dto";
 import {FriendshipService} from "../friendship/friendship.service";
 import {Visibility} from "./user.entity";
 
+// the /users routes
 @Controller('users')
 export class UsersController {
     constructor(private usersService: UsersService,
@@ -25,6 +26,7 @@ export class UsersController {
         return users.map(u => ({ id: u.id, username: u.username, avatar: u.avatar }));
     }
 
+    // GET my full profile
     @ApiOperation({ summary: 'info about me' })
     @UseGuards(JwtAuthGuard)
     @Get('me')
@@ -56,6 +58,7 @@ export class UsersController {
         };
     }
 
+    // PATCH my profile
     @ApiOperation({ summary: 'update my profile' })
     @UseGuards(JwtAuthGuard)
     @Patch('me')
@@ -76,6 +79,7 @@ export class UsersController {
         };
     }
 
+    // PATCH my email
     @ApiOperation({ summary: 'update my email' })
     @UseGuards(JwtAuthGuard)
     @Patch('me/email')
@@ -91,6 +95,7 @@ export class UsersController {
         };
     }
 
+    // PATCH my password
     @ApiOperation({ summary: 'update my password' })
     @UseGuards(JwtAuthGuard)
     @Patch('me/password')
@@ -104,6 +109,7 @@ export class UsersController {
         return { message: 'Password updated successfully' };
     }
 
+    // GET the profile of someone (bio and genres hidden depending on visibility)
     @ApiOperation({ summary: 'Get user profile by id' })
     @ApiParam({ name: 'id', description: 'Id of the user to get' })
     @ApiResponse({ status: 200, description: 'User profile' })
@@ -121,6 +127,7 @@ export class UsersController {
         const visibility = targetUser.visibilitySettings;
         const defaultVis = Visibility.PUBLIC; // si null
 
+        // public = ok friends only = only if friends private = never
         const isFieldVisible = (fieldVisibility: Visibility | undefined) => {
             const vis = fieldVisibility ?? defaultVis;
             if (vis === Visibility.PUBLIC) return true;

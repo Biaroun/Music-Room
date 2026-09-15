@@ -23,6 +23,7 @@ export class TrackVoteController {
         private gateway: TrackVoteGateway,
     ) {}
 
+    // GET the board of an event
     @ApiOperation({ summary: 'Get the current vote board for an event' })
     @ApiResponse({ status: 404, description: 'Event not found or private and not invited' })
     @Get('events/:id/board')
@@ -31,6 +32,7 @@ export class TrackVoteController {
         return this.trackVote.getBoard(id, user.id);
     }
 
+    // POST suggest a track then broadcast
     @ApiOperation({ summary: 'Suggest a track for this event' })
     @Post('events/:id/tracks')
     async suggestTrack(
@@ -44,6 +46,7 @@ export class TrackVoteController {
         return track;
     }
 
+    // POST import one of my playlists then broadcast
     @ApiOperation({ summary: 'Import all tracks from one of my playlists into this event' })
     @ApiResponse({ status: 403, description: 'Not your playlist' })
     @Post('events/:id/import-playlist')
@@ -58,6 +61,7 @@ export class TrackVoteController {
         return result;
     }
 
+    // PUT vote for a track then broadcast
     @ApiOperation({ summary: 'Vote for a track (a user may vote for several tracks, once each)' })
     @ApiResponse({ status: 400, description: 'Location required for a geo-restricted event' })
     @ApiResponse({ status: 403, description: 'Not allowed to vote (license/visibility)' })
@@ -76,6 +80,7 @@ export class TrackVoteController {
         return this.trackVote.getBoard(id, user.id);
     }
 
+    // DELETE my vote then broadcast (coords come in the query)
     @ApiOperation({ summary: 'Retract my vote for one track' })
     @Delete('events/:id/vote/:trackId')
     async retractVote(

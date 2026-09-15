@@ -10,6 +10,7 @@ import * as bcrypt from "bcrypt";
 import {MailService} from "../mail/mail.service";
 import {UpdatePasswordDto} from "./dto/update-password.dto";
 
+// user logic (find create tokens profile email password)
 @Injectable()
 export class UsersService {
   constructor(
@@ -18,6 +19,7 @@ export class UsersService {
     private mailService: MailService
   ) {}
 
+  // find by email with the password (select false on the column sinon)
   async findByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findOne({
       where: { email },
@@ -25,11 +27,13 @@ export class UsersService {
     });
   }
 
+  // same as findByEmail but with the username
   async findByUsername(username: string): Promise<User | null> {
     return await this.userRepository.findOne({ where: { username },
       select: { id: true, username: true, email: true, password: true, emailisVerified: true, oAuthProvider: true }});
   }
 
+  // full user by id (password and tokens included)
   async findById(id: number): Promise<User | null> {
     return await this.userRepository.findOne({
       where: { id },
@@ -63,6 +67,7 @@ export class UsersService {
       .where('user.id != :excludeId', { excludeId: excludeUserId })
       .select(['user.id', 'user.username', 'user.avatar'])
       .orderBy('user.username', 'ASC')
+      // max 50 results
       .limit(50);
 
     if (query) {
@@ -72,6 +77,7 @@ export class UsersService {
     return qb.getMany();
   }
 
+  // find the account linked to this google id (empty id = null)
   async findByGoogleId(googleId: string): Promise<User | null> {
     if (!googleId)
       return null;
@@ -89,6 +95,7 @@ export class UsersService {
     });
   }
 
+  // remove the google id and email from the account
   async detachGoogle(userId: number): Promise<void> {
     await this.userRepository.update(userId, { googleId: null, googleEmail: null });
   }
@@ -97,6 +104,7 @@ export class UsersService {
   // usernames, et deux homonymes feraient sauter la contrainte unique
   async availableUsername(displayName: string): Promise<string> {
     const base = (displayName ?? '')
+      // NFD split the accents then the next replace remove them
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z0-9_-]+/g, '_')
@@ -104,6 +112,7 @@ export class UsersService {
       .slice(0, 30) || 'user';
 
     let candidate = base;
+    // try 5 random suffixes then fallback on random hex
     for (let i = 0; i < 5; i++) {
       if (!await this.isAlreadyExist('username', candidate))
         return candidate;
@@ -112,11 +121,13 @@ export class UsersService {
     return `${base}_${randomBytes(4).toString('hex')}`;
   }
 
+  // create and save a user
   async create(data: Partial<User>): Promise<User> {
     const user = this.userRepository.create(data);
     return await this.userRepository.save(user);
   }
 
+  // true if a user already has this email or username
   async isAlreadyExist(
     field: 'email' | 'username',
     value: string,
@@ -127,6 +138,7 @@ export class UsersService {
     return !!user;
   }
 
+  // new random verify token valid 24h
   async generateEmailVerificationToken(userId: number): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
@@ -139,6 +151,7 @@ export class UsersService {
     return token;
   }
 
+  // mark the email as verified if the token is good and not expired
   async verifyEmailToken(token: string) {
     // sans ce garde, typeorm ignore la condition et renvoie le premier user
     if (!token)
@@ -159,6 +172,7 @@ export class UsersService {
     return true;
   }
 
+  // new random reset token valid 15 min
   async generatePasswordResetToken(userId: number){
     const token = randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -181,6 +195,7 @@ export class UsersService {
     return !!user?.passwordResetExpires && user.passwordResetExpires >= new Date();
   }
 
+  // check the reset token then save the new password and clear the token
   async verifyPasswordResetToken(token: string, newpassword: string) {
     if (!token)
       return false;
@@ -201,6 +216,7 @@ export class UsersService {
     return true;
   }
 
+  // update bio avatar genres visibility (only the fields sent)
   async updateProfile(userId: number, data: UpdateProfileDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user) {
@@ -210,13 +226,16 @@ export class UsersService {
       user.bio = data.bio;
     }
     if (data.avatar !== undefined) {
+      // empty string = remove the avatar
       user.avatar = data.avatar === '' ? null : data.avatar;
     }
     if (data.musicpreferences) {
+      // Set to remove the duplicates
       user.musicpreferences = [...new Set(data.musicpreferences)];
     }
     if (data.visibilitySettings) {
       user.visibilitySettings = {
+        // merge so the keys not sent stay the same
         ...user.visibilitySettings,
         ...data.visibilitySettings,
       };
@@ -224,6 +243,7 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
+  // change the email (need the password) and verify it again
   async updateEmail(userId: number, data: UpdateEmailDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user)
@@ -248,6 +268,7 @@ export class UsersService {
     return await this.findById(userId);
   }
 
+  // change the password (need the current one)
   async updatePassword(userId: number, data: UpdatePasswordDto): Promise<User | null> {
     const user = await this.findById(userId);
     if (!user) {

@@ -1,3 +1,4 @@
+// TL;DR test the playlist gateway (join rights broadcast conflict errors join before auth)
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';

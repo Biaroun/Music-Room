@@ -14,6 +14,7 @@ import { UpdateListeningDto } from './dto/update-listening.dto';
 export class ListeningController {
     constructor(private listening: ListeningService) {}
 
+    // PUT set my current track (heartbeat too)
     @ApiOperation({
         summary: 'Déclarer le morceau que j\'écoute (sert aussi de heartbeat)',
         description: `À rappeler toutes les ${HEARTBEAT_INTERVAL_MS / 1000}s. Sans rappel, l'écoute expire au bout de ${NOW_PLAYING_TTL_MS / 1000}s.`,
@@ -26,6 +27,7 @@ export class ListeningController {
         return this.listening.set(user.id, dto);
     }
 
+    // DELETE I dont listen anything anymore
     @ApiOperation({ summary: "Signaler que je n'écoute plus rien" })
     @ApiResponse({ status: 204, description: 'Écoute effacée' })
     @UseGuards(JwtAuthGuard)
@@ -35,6 +37,7 @@ export class ListeningController {
         await this.listening.clear(user.id);
     }
 
+    // GET what my friends listen right now
     @ApiOperation({ summary: 'Ce que mes amis écoutent en ce moment' })
     @ApiResponse({ status: 200, description: 'Liste des écoutes en cours visibles' })
     @UseGuards(JwtAuthGuard)

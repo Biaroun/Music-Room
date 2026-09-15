@@ -6,6 +6,7 @@ import { AuthGuard } from '@nestjs/passport';
 // d'une connexion
 @Injectable()
 export class GoogleAuthGuard extends AuthGuard('google') {
+    // pass the link ticket as state if there is one
     getAuthenticateOptions(context: ExecutionContext) {
         const link = context.switchToHttp().getRequest().query?.link;
         return typeof link === 'string' && link ? { state: link } : {};

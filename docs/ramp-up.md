@@ -88,7 +88,7 @@ make load-seed                                   # 20 comptes + 1 playlist chacu
 ```
 
 Sans `THROTTLE_ALLOWLIST`, le seeder fonctionne quand même mais attend une minute tous les
-5 comptes, à cause du plafond anti-bruteforce sur `/auth/register` et `/auth/login`.
+5 comptes, à cause du plafond anti-bruteforce sur `/auth/register`.
 
 Le pool part dans `scripts/load/load-users.json` (ignoré par git : il contient des mots de
 passe et des JWT valides 7 jours).

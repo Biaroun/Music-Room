@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import PressableCard from './PressableCard';
 
+// close the auth popup when we come back on web
 WebBrowser.maybeCompleteAuthSession();
 
 /**
@@ -35,9 +36,11 @@ export default function GoogleSignInButton({ label = 'Continue with Google' }: {
         return found || null;
     }
 
+    // open the backend google flow then login with the token from the url
     async function signIn() {
         setLoading(true);
         try {
+            // on web google come back to our origin (native = default redirect)
             const appUrl = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
             const result = await WebBrowser.openAuthSessionAsync(`${getApiUrl()}/auth/google/web`, appUrl);
 
@@ -58,12 +61,14 @@ export default function GoogleSignInButton({ label = 'Continue with Google' }: {
 
     return (
         <View style={styles.wrapper}>
+            {/* or separator line */}
             <View style={styles.separator}>
                 <View style={styles.rule} />
                 <Text style={styles.separatorText}>or</Text>
                 <View style={styles.rule} />
             </View>
 
+            {/* the google button */}
             <PressableCard
                 style={styles.button}
                 disabled={loading}

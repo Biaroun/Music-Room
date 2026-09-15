@@ -4,6 +4,7 @@ import { Strategy } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
 import { GoogleIdentity } from '../../users/user.entity';
 
+// passport strategy for the google web oauth flow
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     constructor(
@@ -17,6 +18,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         });
     }
 
+    // turn the google profile into our GoogleIdentity
     async validate(accessToken: string, refreshToken: string, profile: any): Promise<GoogleIdentity> {
         const email = profile.emails?.[0]?.value;
         // une adresse non verifiee chez google ne prouve rien

@@ -10,6 +10,7 @@ import Field from '../components/Field';
 import Button from '../components/Button';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 
+// login screen (email or username + password google register forgot server)
 export default function LoginScreen({ navigation }: any) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +24,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const canSubmit = login.trim().length > 0 && password.length > 0;
 
+  // POST login then save the token (AuthContext switch to the app screens)
   async function handleLogin() {
     if (!canSubmit) return;
     setLoading(true);
@@ -41,6 +43,7 @@ export default function LoginScreen({ navigation }: any) {
 
   return (
     <Screen narrow center>
+      {/* logo and title */}
       <View style={styles.brand}>
         <View style={styles.logo}>
           <Ionicons name="musical-notes" size={26} color={colors.onAccent} />
@@ -49,6 +52,7 @@ export default function LoginScreen({ navigation }: any) {
         <Text style={[typography.caption, styles.tagline]}>Connect to your account</Text>
       </View>
 
+      {/* login form */}
       <Field
         label="Email or username"
         placeholder="you@example.com"
@@ -71,6 +75,7 @@ export default function LoginScreen({ navigation }: any) {
 
       <Button title="Login" onPress={handleLogin} loading={loading} disabled={!canSubmit} style={styles.submit} />
 
+      {/* google login forgot password and register links */}
       <GoogleSignInButton label="Continue with Google" />
 
       <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={styles.link}>
@@ -84,6 +89,7 @@ export default function LoginScreen({ navigation }: any) {
         </Pressable>
       </View>
 
+      {/* current server (without http) + link to change it */}
       <Pressable onPress={() => navigation.navigate('ServerSettings')} style={styles.server}>
         <Ionicons name="server-outline" size={12} color={colors.textTertiary} />
         <Text style={[typography.caption, { color: colors.textTertiary }]} numberOfLines={1}>

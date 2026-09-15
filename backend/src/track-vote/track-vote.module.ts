@@ -15,6 +15,7 @@ import { PlaylistTrack } from '../playlist-editor/playlist-track.entity';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { User } from '../users/user.entity';
 
+// track vote module (events votes gateway)
 @Module({
   imports: [
     // User : JwtAuthGuard en a besoin pour le controle emailisVerified

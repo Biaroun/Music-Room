@@ -22,15 +22,18 @@ export default function GoogleLinkCard({ googleEmail, hasPassword, onChange }: P
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
 
+  // 1) ask a ticket 2) open google with it 3) read the result in the url fragment
   async function link() {
     setBusy(true);
     try {
       const { ticket } = await apiFetch('/auth/google/link-ticket', token, { method: 'POST' });
+      // on web google come back to our origin (native = default redirect)
       const appUrl = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
       const result = await WebBrowser.openAuthSessionAsync(
         `${getApiUrl()}/auth/google/web?link=${encodeURIComponent(ticket)}`,
         appUrl,
       );
+      // closed or canceled = nothing to do
       if (result.type !== 'success')
         return;
 
@@ -49,6 +52,7 @@ export default function GoogleLinkCard({ googleEmail, hasPassword, onChange }: P
     }
   }
 
+  // remove the google link then refresh the profile
   async function unlink() {
     setBusy(true);
     try {
@@ -64,6 +68,7 @@ export default function GoogleLinkCard({ googleEmail, hasPassword, onChange }: P
 
   return (
     <View style={ui.card}>
+      {/* google icon + linked status */}
       <View style={styles.row}>
         <View style={styles.icon}>
           <Ionicons name="logo-google" size={18} color={colors.textPrimary} />
@@ -76,6 +81,7 @@ export default function GoogleLinkCard({ googleEmail, hasPassword, onChange }: P
         </View>
       </View>
 
+      {/* linked = unlink button (disabled without password) sinon link button */}
       {googleEmail ? (
         <>
           <Button

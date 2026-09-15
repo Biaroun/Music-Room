@@ -1,3 +1,4 @@
+// TL;DR test the avatar validation of the update profile dto
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { UpdateProfileDto } from './update-profile.dto';

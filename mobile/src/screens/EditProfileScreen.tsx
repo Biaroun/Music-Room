@@ -16,16 +16,20 @@ type MusicGenre = 'rap' | 'rnb' | 'rock' | 'pop' | 'jazz' | 'classical' | 'elect
 type Visibility = 'public' | 'friends-only' | 'private';
 type VisibilityField = 'username' | 'bio' | 'musicPreferences' | 'listening';
 
+// same genres as the backend enum
 const GENRES: MusicGenre[] = ['rap', 'rnb', 'rock', 'pop', 'jazz', 'classical', 'electro', 'reggae', 'metal', 'country'];
 const VISIBILITIES: Visibility[] = ['public', 'friends-only', 'private'];
+// fields with a visibility setting
 const FIELDS: { key: VisibilityField; label: string }[] = [
   { key: 'username', label: 'Username' },
   { key: 'bio', label: 'Bio' },
   { key: 'musicPreferences', label: 'Music preferences' },
   { key: 'listening', label: 'Current listening' },
 ];
+// same max as the backend dto
 const BIO_MAX = 255;
 
+// edit my avatar bio genres and visibility
 export default function EditProfileScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -39,11 +43,13 @@ export default function EditProfileScreen({ navigation }: any) {
   });
   const [avatar, setAvatar] = useState<string | null>(null);
 
+  // load my current profile to fill the form
   useEffect(() => {
     apiFetch('/users/me', token)
       .then((me) => {
         setBio(me.bio ?? '');
         setGenres(me.musicpreferences ?? []);
+        // merge on the defaults (old accounts dont have listening)
         setVisibility((v) => ({ ...v, ...(me.visibilitySettings ?? {}) }));
         setAvatar(me.avatar || null);
       })
@@ -51,15 +57,18 @@ export default function EditProfileScreen({ navigation }: any) {
       .finally(() => setLoading(false));
   }, []);
 
+  // add the genre or remove it if already picked
   function toggleGenre(g: MusicGenre) {
     setGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
   }
 
+  // PATCH the whole profile then go back
   async function save() {
     setSaving(true);
     try {
       await apiFetch('/users/me', token, {
         method: 'PATCH',
+        // no avatar = empty string (the backend put null)
         body: JSON.stringify({ bio, musicpreferences: genres, visibilitySettings: visibility, avatar: avatar ?? '' }),
       });
       showToast({ type: 'success', message: 'Profile updated' });
@@ -81,6 +90,7 @@ export default function EditProfileScreen({ navigation }: any) {
 
   return (
     <Screen>
+      {/* avatar picker */}
       <Text style={[typography.h2, styles.firstSection]}>Avatar</Text>
       <View style={styles.avatars}>
         {AVATARS.map((a) => {
@@ -104,6 +114,7 @@ export default function EditProfileScreen({ navigation }: any) {
         })}
       </View>
 
+      {/* bio with the char counter */}
       <Text style={[typography.h2, ui.section]}>Bio</Text>
       <Field
         placeholder="Tell something about you..."
@@ -114,6 +125,7 @@ export default function EditProfileScreen({ navigation }: any) {
         hint={`${bio.length}/${BIO_MAX}`}
       />
 
+      {/* genre chips */}
       <Text style={[typography.h2, ui.section]}>Music preferences</Text>
       <View style={styles.chips}>
         {GENRES.map((g) => {
@@ -131,6 +143,7 @@ export default function EditProfileScreen({ navigation }: any) {
         })}
       </View>
 
+      {/* one segmented control per field (public friends only private) */}
       <Text style={[typography.h2, ui.section]}>Visibility</Text>
       {FIELDS.map((f) => (
         <View key={f.key} style={styles.visRow}>
@@ -153,6 +166,7 @@ export default function EditProfileScreen({ navigation }: any) {
         </View>
       ))}
 
+      {/* save and cancel */}
       <Button title="Save profile" icon="checkmark" onPress={save} loading={saving} style={{ marginTop: spacing.xl }} />
       <Button title="Cancel" variant="ghost" onPress={() => navigation.goBack()} style={{ marginTop: spacing.sm }} />
     </Screen>

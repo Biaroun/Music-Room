@@ -13,6 +13,7 @@ import Button from '../components/Button';
 import { listEvents, createEvent, type ApiEvent } from '../lib/trackVote';
 import { listMyPlaylists, type ApiPlaylist } from '../lib/playlists';
 
+// list of the events I can see + create an event from a playlist
 export default function EventsScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -30,6 +31,7 @@ export default function EventsScreen({ navigation }: any) {
   // 2 colonnes des qu'on a la place (web / tablette), 1 sur telephone
   const columns = width >= layout.wideBreakpoint ? 2 : 1;
 
+  // reload the events and my plan each time we come back
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -44,6 +46,7 @@ export default function EventsScreen({ navigation }: any) {
     }, [token]),
   );
 
+  // not premium = go to settings sinon open the playlist picker
   async function openPicker() {
     if (!isPremium) {
       navigation.navigate('Settings');
@@ -62,6 +65,7 @@ export default function EventsScreen({ navigation }: any) {
     }
   }
 
+  // create the event with the playlist name and open it
   async function createFromPlaylist(playlist: ApiPlaylist) {
     setCreating(true);
     try {
@@ -86,11 +90,13 @@ export default function EventsScreen({ navigation }: any) {
   return (
     <Screen scroll={false} padded={false} wide>
       <FlatList
+        // key = columns so the FlatList remount when the columns change (numColumns cant change live)
         key={columns}
         data={events}
         numColumns={columns}
         columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
         keyExtractor={(e) => String(e.id)}
+        // +88 so the last row is not under the floating button
         contentContainerStyle={[styles.list, { paddingBottom: bottomInset + 88 }]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
@@ -114,6 +120,7 @@ export default function EventsScreen({ navigation }: any) {
             onAction={openPicker}
           />
         }
+        // one row per event (badges public yours invited location + can vote status)
         renderItem={({ item }) => (
           <PressableCard
             style={[styles.row, !item.canVote && styles.rowMuted, columns > 1 && styles.rowGrid]}
@@ -169,6 +176,7 @@ export default function EventsScreen({ navigation }: any) {
         )}
       />
 
+      {/* floating new event or upgrade button */}
       {events.length > 0 && (
         <View style={[styles.fabWrap, { bottom: bottomInset + spacing.md }]}>
           <Button
@@ -180,6 +188,7 @@ export default function EventsScreen({ navigation }: any) {
         </View>
       )}
 
+      {/* playlist picker to create an event (tap outside = close) */}
       <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
         <Pressable style={styles.overlay} onPress={() => setPickerVisible(false)}>
           <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>

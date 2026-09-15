@@ -13,6 +13,7 @@ type TrackSearchProps = {
   placeholder?: string;
 };
 
+// deezer result to a player track (only called when previewUrl exist)
 function toPreviewTrack(t: DeezerTrack): PreviewTrack {
   return {
     id: t.id,
@@ -25,6 +26,7 @@ function toPreviewTrack(t: DeezerTrack): PreviewTrack {
   };
 }
 
+// deezer search box + results (select to add or tap to preview)
 export default function TrackSearch({
   onSelect,
   placeholder = "Search a track…",
@@ -39,8 +41,10 @@ export default function TrackSearch({
     if (error) showToast({ type: "error", message: error });
   }, [error]);
 
+  // queue for the player = only the results with a preview
   const playableQueue = results.filter((r) => r.previewUrl).map(toPreviewTrack);
 
+  // tap on a row = select if onSelect sinon play the preview
   function pressRow(r: DeezerTrack) {
     if (onSelect) {
       // on ne vide pas la recherche : permet d'ajouter plusieurs sons du meme
@@ -53,6 +57,7 @@ export default function TrackSearch({
 
   return (
     <View>
+      {/* search input with spinner and clear button */}
       <View style={[styles.searchRow, focused && styles.searchRowFocused]}>
         <Ionicons name="search" size={17} color={focused ? colors.accent : colors.textSecondary} />
         <TextInput
@@ -73,6 +78,7 @@ export default function TrackSearch({
         )}
       </View>
 
+      {/* results only when there is a query */}
       {query.trim().length > 0 && (
         <View style={styles.results}>
           {results.map((r) => {
@@ -101,6 +107,7 @@ export default function TrackSearch({
                 {r.previewUrl ? (
                   <Pressable
                     onPress={(e) => {
+                      // dont trigger the row press (sinon it select the track too)
                       e.stopPropagation();
                       toggle(toPreviewTrack(r), playableQueue);
                     }}
@@ -118,6 +125,7 @@ export default function TrackSearch({
               </PressableCard>
             );
           })}
+          {/* no result message */}
           {!loading && !error && results.length === 0 && (
             <Text style={styles.empty}>No results for “{query.trim()}”</Text>
           )}

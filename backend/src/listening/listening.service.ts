@@ -5,6 +5,7 @@ import { UpdateListeningDto } from './dto/update-listening.dto';
 import { FriendshipService } from '../friendship/friendship.service';
 import { LISTENING_VISIBILITY_DEFAULT, User, Visibility } from '../users/user.entity';
 
+// what a user is listening right now
 export type NowPlaying = {
     userId: number;
     deezerId: string;
@@ -29,6 +30,7 @@ export const NOW_PLAYING_TTL_MS = 120_000;
 // l'ecoute
 export const HEARTBEAT_INTERVAL_MS = 45_000;
 
+// now playing stored in redis + who can see it
 @Injectable()
 export class ListeningService {
     constructor(
@@ -36,10 +38,12 @@ export class ListeningService {
         private friendship: FriendshipService,
     ) {}
 
+    // redis key for one user
     private key(userId: number): string {
         return `nowplaying:${userId}`;
     }
 
+    // save the current track (also used as heartbeat to refresh the ttl)
     async set(userId: number, dto: UpdateListeningDto): Promise<NowPlaying> {
         const existing = await this.get(userId);
         const entry: NowPlaying = {
@@ -55,19 +59,23 @@ export class ListeningService {
         return entry;
     }
 
+    // the user stop listening
     async clear(userId: number): Promise<void> {
         await this.cache.del(this.key(userId));
     }
 
+    // current track of a user or null if expired
     async get(userId: number): Promise<NowPlaying | null> {
         return (await this.cache.get<NowPlaying>(this.key(userId))) ?? null;
     }
 
+    // current tracks of many users (on skip the ones with nothing)
     async getMany(userIds: number[]): Promise<NowPlaying[]> {
         const entries = await Promise.all(userIds.map((id) => this.get(id)));
         return entries.filter((e): e is NowPlaying => e !== null);
     }
 
+    // listening visibility of a user (default if never set)
     private listeningVisibility(user: User): Visibility {
         return user.visibilitySettings?.listening ?? LISTENING_VISIBILITY_DEFAULT;
     }
@@ -79,6 +87,7 @@ export class ListeningService {
         let me: User | null = null;
         const friends = relations.map((relation) => {
             const iAmRequester = relation.requester.id === userId;
+            // my own profile is on every relation so we take it once
             me ??= iAmRequester ? relation.requester : relation.receiver;
             return iAmRequester ? relation.receiver : relation.requester;
         });

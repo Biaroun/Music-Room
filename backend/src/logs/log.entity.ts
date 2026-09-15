@@ -7,6 +7,7 @@ export enum LogChannel {
     REALTIME = 'realtime',
 }
 
+// one row per action (http request or ws message)
 @Entity()
 export class Log {
     @PrimaryGeneratedColumn()
@@ -23,12 +24,14 @@ export class Log {
     @Column({ type: 'int', nullable: true })
     statusCode: number | null;
 
+    // time taken by the handler in ms
     @Column({ type: 'int' })
     durationMs: number;
 
     @Column({ type: 'boolean', default: true })
     success: boolean;
 
+    // error message when success is false
     @Column({ type: 'text', nullable: true })
     error: string | null;
 

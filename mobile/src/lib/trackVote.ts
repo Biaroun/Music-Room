@@ -3,6 +3,7 @@ import { apiFetch } from '../config/api';
 export type EventVisibility = 'public' | 'private';
 export type EventLicenseMode = 'open' | 'invite-only' | 'geo-time-restricted';
 
+// an event as the api send it
 export type ApiEvent = {
   id: number;
   name: string;
@@ -24,6 +25,7 @@ export type ApiEvent = {
   canVote: boolean;
 };
 
+// body to create an event (geo fields only for geo time mode)
 export type CreateEventInput = {
   name: string;
   playlistId: number;
@@ -36,6 +38,7 @@ export type CreateEventInput = {
   licenseEndsAt?: string;
 };
 
+// one line of the vote board
 export type BoardTrack = {
   trackId: number;
   deezerId: string;
@@ -46,6 +49,7 @@ export type BoardTrack = {
   myVote: boolean;
 };
 
+// track playing now in the event (startedAt in ms)
 export type NowPlaying = {
   trackId: number;
   deezerId: string;
@@ -57,12 +61,14 @@ export type NowPlaying = {
   durationMs: number;
 };
 
+// the full board (ranked tracks + now playing)
 export type Board = {
   tracks: BoardTrack[];
   nowPlaying: NowPlaying | null;
   updatedAt: number;
 };
 
+// body to suggest a track
 export type SuggestTrackInput = {
   deezerId: string;
   title: string;
@@ -73,50 +79,63 @@ export type SuggestTrackInput = {
   bpm?: number | null;
 };
 
+// gps position sent with a vote
 export type VotePosition = { latitude: number; longitude: number };
 
+// events I can see
 export function listEvents(token: string | null): Promise<ApiEvent[]> {
   return apiFetch('/track-vote/events', token);
 }
 
+// one event
 export function getEvent(id: number, token: string | null): Promise<ApiEvent> {
   return apiFetch(`/track-vote/events/${id}`, token);
 }
 
+// create an event (premium only)
 export function createEvent(token: string | null, body: CreateEventInput): Promise<ApiEvent> {
   return apiFetch('/track-vote/events', token, { method: 'POST', body: JSON.stringify(body) });
 }
 
+// delete an event
 export function deleteEvent(id: number, token: string | null): Promise<void> {
   return apiFetch(`/track-vote/events/${id}`, token, { method: 'DELETE' });
 }
 
+// update an event
 export function updateEvent(id: number, token: string | null, patch: Partial<CreateEventInput>): Promise<ApiEvent> {
   return apiFetch(`/track-vote/events/${id}`, token, { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
+// an invite row with the invited user
 export type InvitedUser = { id: number; invitee: { id: number; username: string } };
 
+// invited users of an event
 export function listInvited(eventId: number, token: string | null): Promise<InvitedUser[]> {
   return apiFetch(`/track-vote/events/${eventId}/invites`, token);
 }
 
+// invite a user
 export function inviteToEvent(eventId: number, userId: number, token: string | null): Promise<void> {
   return apiFetch(`/track-vote/events/${eventId}/invites/${userId}`, token, { method: 'POST' });
 }
 
+// remove an invite
 export function uninviteFromEvent(eventId: number, userId: number, token: string | null): Promise<void> {
   return apiFetch(`/track-vote/events/${eventId}/invites/${userId}`, token, { method: 'DELETE' });
 }
 
+// the vote board (rest fallback)
 export function getBoard(eventId: number, token: string | null): Promise<Board> {
   return apiFetch(`/track-vote/events/${eventId}/board`, token);
 }
 
+// suggest a track for the event
 export function suggestTrack(eventId: number, token: string | null, dto: SuggestTrackInput): Promise<unknown> {
   return apiFetch(`/track-vote/events/${eventId}/tracks`, token, { method: 'POST', body: JSON.stringify(dto) });
 }
 
+// copy one of my playlists in the event
 export function importPlaylist(eventId: number, playlistId: number, token: string | null): Promise<{ added: number }> {
   return apiFetch(`/track-vote/events/${eventId}/import-playlist`, token, {
     method: 'POST',
@@ -124,6 +143,7 @@ export function importPlaylist(eventId: number, playlistId: number, token: strin
   });
 }
 
+// vote for a track (position spread in the body if given)
 export function castVote(
   eventId: number,
   trackId: number,
@@ -136,6 +156,7 @@ export function castVote(
   });
 }
 
+// remove my vote (DELETE has no body so the position goes in the query)
 export function retractVote(
   eventId: number,
   trackId: number,

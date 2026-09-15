@@ -1,3 +1,4 @@
+// TL;DR test the playlist controller call the service and broadcast after rest edits
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlaylistEditorController } from './playlist-editor.controller';
 import { PlaylistEditorService } from './playlist-editor.service';

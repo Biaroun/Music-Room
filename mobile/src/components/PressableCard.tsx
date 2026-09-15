@@ -37,6 +37,7 @@ export default function PressableCard({
         hovered && !disabled && (hoverStyle ?? styles.defaultHover),
         pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
+        // no pointer cursor if nothing happen on press
         { cursor: disabled || !onPress ? 'auto' : 'pointer' },
       ]}
     >

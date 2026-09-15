@@ -1,5 +1,7 @@
+// mean radius of the earth
 const EARTH_RADIUS_METERS = 6_371_000;
 
+// degrees to radians
 function toRadians(degrees: number): number {
     return (degrees * Math.PI) / 180;
 }
@@ -15,6 +17,7 @@ export function haversineDistanceMeters(
     const lat1 = toRadians(a.latitude);
     const lat2 = toRadians(b.latitude);
 
+    // haversine formula (h then c = angle between the 2 points)
     const h =
         Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));

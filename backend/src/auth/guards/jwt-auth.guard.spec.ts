@@ -1,3 +1,4 @@
+// TL;DR test the jwt guard block unverified emails except on AllowUnverified routes
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt-auth.guard';

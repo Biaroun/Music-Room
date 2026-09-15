@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User, SubscriptionPlan } from '../users/user.entity';
 import { MailService } from '../mail/mail.service';
 
+// fake premium subscription (no payment just a flag + a mail)
 @Injectable()
 export class SubscriptionService {
     constructor(
@@ -11,6 +12,7 @@ export class SubscriptionService {
         private mail: MailService,
     ) {}
 
+    // go premium (409 if already premium) then send the mail
     async subscribe(userId: number): Promise<User> {
         const user = await this.findUser(userId);
         if (user.plan === SubscriptionPlan.PREMIUM) {
@@ -25,6 +27,7 @@ export class SubscriptionService {
         return saved;
     }
 
+    // back to free (409 if already free) then send the mail
     async cancel(userId: number): Promise<User> {
         const user = await this.findUser(userId);
         if (user.plan === SubscriptionPlan.FREE) {
@@ -45,6 +48,7 @@ export class SubscriptionService {
         return user?.plan === SubscriptionPlan.PREMIUM;
     }
 
+    // load the user or 404
     private async findUser(userId: number): Promise<User> {
         const user = await this.users.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');

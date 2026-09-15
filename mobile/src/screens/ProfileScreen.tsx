@@ -13,6 +13,7 @@ import Screen from '../components/Screen';
 import Button from '../components/Button';
 
 type Visibility = 'public' | 'friends-only' | 'private';
+// my profile as GET users me send it
 type Me = {
   username: string;
   email: string;
@@ -23,18 +24,21 @@ type Me = {
   visibilitySettings?: { username?: Visibility; bio?: Visibility; musicPreferences?: Visibility; listening?: Visibility } | null;
 };
 
+// icon per visibility value
 const VIS_ICON: Record<Visibility, React.ComponentProps<typeof Ionicons>['name']> = {
   public: 'earth',
   'friends-only': 'people',
   private: 'lock-closed',
 };
 
+// read only view of my profile
 export default function ProfileScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // reload the profile each time we come back (after edit)
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -62,6 +66,7 @@ export default function ProfileScreen({ navigation }: any) {
   const av = getAvatar(me?.avatar ?? null);
   const verified = !!me?.emailisVerified;
 
+  // rows of the visibility card (same defaults as the backend)
   const visRows: { label: string; value: Visibility }[] = [
     { label: 'Username', value: vis.username ?? 'public' },
     { label: 'Bio', value: vis.bio ?? 'public' },
@@ -71,6 +76,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <Screen>
+      {/* avatar (or first letter) name email verified badge */}
       <View style={styles.header}>
         {av ? (
           <Image source={av.source} style={styles.avatarImg} />
@@ -93,6 +99,7 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       </View>
 
+      {/* bio card */}
       <Text style={[typography.h2, ui.section]}>Bio</Text>
       <View style={ui.card}>
         <Text style={[typography.body, styles.bio, !me?.bio && { color: colors.textSecondary, fontStyle: 'italic' }]}>
@@ -100,6 +107,7 @@ export default function ProfileScreen({ navigation }: any) {
         </Text>
       </View>
 
+      {/* genres chips or empty card */}
       <Text style={[typography.h2, ui.section]}>Music preferences</Text>
       {genres.length ? (
         <View style={styles.chips}>
@@ -115,6 +123,7 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
       )}
 
+      {/* visibility of each field */}
       <Text style={[typography.h2, ui.section]}>Visibility</Text>
       <View style={styles.visCard}>
         {visRows.map((r, i) => (
