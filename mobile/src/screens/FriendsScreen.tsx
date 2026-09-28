@@ -630,7 +630,6 @@ export default function FriendsScreen({ navigation }: any) {
                             )}
                         </View>
                     </View>
-                    {/* actions depend on the status (rien pour un ami) */}
                     {selected.status !== 'friend' && (
                     <View style={styles.cardActions}>
                         {selected.status === 'stranger' && (
