@@ -630,17 +630,9 @@ export default function FriendsScreen({ navigation }: any) {
                             )}
                         </View>
                     </View>
-                    {/* actions depend on the status */}
+                    {/* actions depend on the status (rien pour un ami) */}
+                    {selected.status !== 'friend' && (
                     <View style={styles.cardActions}>
-                        {selected.status === 'friend' && ['Voir le profil', 'Inviter à ecouter'].map(lbl => (
-                            <TouchableOpacity
-                                key={lbl}
-                                style={styles.cardAction}
-                                onPress={() => showToast({ type: 'info', message: `« ${lbl} » arrive bientôt` })}
-                            >
-                                <Text style={styles.cardActionText}>{lbl}</Text>
-                            </TouchableOpacity>
-                        ))}
                         {selected.status === 'stranger' && (
                             <>
                                 <TouchableOpacity style={styles.cardAction} onPress={() => sendRequest(selected.userId)}>
@@ -667,6 +659,7 @@ export default function FriendsScreen({ navigation }: any) {
                             </>
                         )}
                     </View>
+                    )}
                 </TouchableOpacity>
             )}
 
