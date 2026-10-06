@@ -6,7 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { markEmailVerified } = require('./lib/mark-email-verified');
 
-const API_URL = process.env.API_URL || 'http://localhost:3000';
+const API_URL = process.env.API_URL || 'http://localhost:8081';
 const CREDENTIALS_FILE = path.join(__dirname, '..', 'backend', '.env.seed-users');
 
 const USERS = [
