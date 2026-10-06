@@ -1,6 +1,7 @@
 // TL;DR test playlist rights (view edit license) reorder version bumps state findMine editors
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In, Not } from 'typeorm';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PlaylistEditorService } from './playlist-editor.service';
 import { Playlist, PlaylistLicenseMode } from './playlist.entity';
@@ -266,27 +267,47 @@ describe('PlaylistEditorService', () => {
   });
 
   describe('findMine', () => {
-    it('returns owned playlists and the ones I collaborate on, flagged with isOwner', async () => {
+    it('returns owned, then shared, then public playlists of other users, flagged with isOwner', async () => {
       playlists.find
         .mockResolvedValueOnce([basePlaylist({ id: 10 })])
-        .mockResolvedValueOnce([basePlaylist({ id: 20, owner: { id: 42, username: 'someoneElse' } as any })]);
+        .mockResolvedValueOnce([basePlaylist({ id: 20, owner: { id: 42, username: 'someoneElse' } as any })])
+        .mockResolvedValueOnce([basePlaylist({ id: 30, owner: { id: STRANGER, username: 'stranger' } as any })]);
       collaborators.find.mockResolvedValue([{ playlist: { id: 20 } }]);
 
       const rows = await service.findMine(OWNER);
 
-      expect(rows).toHaveLength(2);
+      expect(rows).toHaveLength(3);
       expect(rows[0]).toMatchObject({ id: 10, isOwner: true });
       expect(rows[1]).toMatchObject({ id: 20, isOwner: false });
+      expect(rows[2]).toMatchObject({ id: 30, isOwner: false });
     });
 
-    it('does not query playlists a second time when I collaborate on none', async () => {
-      playlists.find.mockResolvedValueOnce([basePlaylist({ id: 10 })]);
+    it('lists only public playlists of other users, skipping the shared ones', async () => {
+      playlists.find.mockResolvedValue([]);
+      collaborators.find.mockResolvedValue([{ playlist: { id: 20 } }]);
+
+      await service.findMine(OWNER);
+
+      expect(playlists.find).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: { isPublic: true, owner: { id: Not(OWNER) }, id: Not(In([20])) },
+        }),
+      );
+    });
+
+    it('skips the shared query when I collaborate on none', async () => {
+      playlists.find
+        .mockResolvedValueOnce([basePlaylist({ id: 10 })])
+        .mockResolvedValueOnce([]);
       collaborators.find.mockResolvedValue([]);
 
       const rows = await service.findMine(OWNER);
 
       expect(rows).toEqual([expect.objectContaining({ id: 10, isOwner: true })]);
-      expect(playlists.find).toHaveBeenCalledTimes(1);
+      expect(playlists.find).toHaveBeenCalledTimes(2);
+      expect(playlists.find).toHaveBeenLastCalledWith(
+        expect.objectContaining({ where: { isPublic: true, owner: { id: Not(OWNER) } } }),
+      );
     });
   });
 

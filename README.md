@@ -44,7 +44,7 @@ Aucune bibliothèque tierce n'est commitée : tout s'installe via `npm install` 
 | `DATABASE_URL`, `REDIS_URL` | Déjà alignées sur `docker-compose.yml` |
 | `JWT_SECRET` | Secret de signature des tokens, à changer |
 | `GOOGLE_CLIENT_ID_*`, `GOOGLE_CLIENT_SECRET_WEB` | Connexion Google : identifiants à créer dans la Google Cloud Console |
-| `OAUTH_APP_REDIRECT` | Page de l'app vers laquelle le backend renvoie après une connexion Google |
+| `OAUTH_APP_REDIRECT` | Adresses de l'app (web, `musicroom://`, `exp://` en dev) vers lesquelles le backend a le droit de renvoyer après Google, séparées par des virgules |
 | `MAIL_*` | Envoi des mails (voir ci-dessous) |
 | `THROTTLE_*` | Limitation des requêtes (voir Sécurité) |
 
@@ -69,6 +69,8 @@ L'adresse du backend se change **depuis l'application**, via l'écran **Server**
 La valeur par défaut peut aussi être fixée au build avec `EXPO_PUBLIC_API_URL` dans `mobile/.env`.
 
 > Si le port 3000 est déjà pris, le backend passe automatiquement au port suivant et l'affiche au démarrage.
+
+> **Connexion Google sur mobile** : Google renvoie toujours sur `GOOGLE_CALLBACK_URL_WEB` (`http://localhost:3000/...`). Sur l'émulateur Android (ou un téléphone branché en USB), `localhost` désigne l'appareil : `make start` et `make dev-mobile` lancent `adb reverse tcp:3000 tcp:3000` pour que cette adresse atteigne le backend. Si l'émulateur a démarré après, ou a redémarré : `make android-reverse`. Sur un téléphone physique, il faut une URL publique en HTTPS (tunnel type ngrok), déclarée comme URI de redirection dans la console Google et reprise dans `GOOGLE_CALLBACK_URL_WEB`. Sous Expo Go, `OAUTH_APP_REDIRECT` doit contenir `exp://`.
 
 ### Comptes de test
 
@@ -98,8 +100,8 @@ La documentation Swagger est générée automatiquement à partir du code : mét
 | Exigence | Implémentation |
 |---|---|
 | Inscription mail / mot de passe | `POST /auth/register`, écran Register |
-| Inscription / connexion par réseau social | Google (le sujet demande Facebook **ou** Google) : flux web `GET /auth/google/web` et token mobile `POST /auth/google/mobile` |
-| Lier un compte existant à Google | `POST /auth/google/link-ticket` puis flux Google ; déliaison avec `DELETE /auth/google/link` |
+| Inscription / connexion par réseau social | Google (le sujet demande Facebook **ou** Google) : l'app ouvre `GET /auth/google/web` dans le navigateur, revient avec un code à usage unique et l'échange avec `POST /auth/google/exchange` (PKCE). `POST /auth/google/mobile` accepte aussi un id token Google |
+| Lier un compte existant à Google | Même flux Google, puis `POST /auth/google/link` avec le JWT ; déliaison avec `DELETE /auth/google/link` |
 | Validation du mail | Mail envoyé à l'inscription ; tant qu'il n'est pas validé, l'app n'affiche que l'écran de vérification (renvoi possible) |
 | Mot de passe oublié | `POST /auth/forgot-password`, lien par mail vers un formulaire de réinitialisation |
 | Profil : infos publiques, amis, privées, goûts musicaux | Chaque champ du profil a sa propre visibilité : public, amis seulement ou privé. Goûts musicaux choisis parmi une liste de genres. Système d'amis (demandes, acceptation) |
@@ -144,7 +146,7 @@ Toutes les données sont stockées côté backend (PostgreSQL), qui fait référ
 | Vol de session | Tokens JWT à durée limitée ; à la déconnexion, le token est placé en liste noire dans Redis (refusé en HTTP comme en WebSocket) |
 | Mots de passe | Hachés avec bcrypt, jamais renvoyés par l'API |
 | Injection / champs inattendus | Validation de toutes les entrées (`ValidationPipe` en mode `whitelist`), requêtes paramétrées via TypeORM |
-| Redirection ouverte après la connexion Google | L'adresse de retour vient de la configuration, jamais de la requête ; le token passe dans le fragment de l'URL, donc n'apparaît pas dans les logs d'accès |
+| Redirection ouverte et vol du retour Google | L'adresse de retour doit figurer dans `OAUTH_APP_REDIRECT`. Elle reçoit un code d'une minute, à usage unique, échangeable seulement avec le vérificateur PKCE gardé par l'app : un code intercepté ne sert à rien, et le JWT ne passe jamais dans une URL. Google n'est jamais rattaché par e-mail à un compte dont l'adresse n'est pas vérifiée |
 | Secrets | Uniquement dans des `.env` ignorés par git |
 
 ### Logs (sujet V.6)

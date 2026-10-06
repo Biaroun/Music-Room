@@ -30,8 +30,7 @@ export class PlaylistEditorController {
         return this.service.create(user.id, dto);
     }
 
-    // GET my playlists (owned + shared)
-    @ApiOperation({ summary: 'List the playlists I own or co-edit' })
+    @ApiOperation({ summary: 'List the playlists I own or co-edit, then the public playlists of other users' })
     @Get()
     findMine(@CurrentUser() user: { id: number }) {
         return this.service.findMine(user.id);

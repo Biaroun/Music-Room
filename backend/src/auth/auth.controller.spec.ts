@@ -1,10 +1,12 @@
 // TL;DR test the html reset password page and form (valid expired XSS escape dto rules)
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { encodeFlowState } from './google-flow';
 
 // faux Response express : on garde le statut et le html envoyes
 function fakeRes() {
@@ -12,6 +14,7 @@ function fakeRes() {
   res.status = jest.fn((code: number) => { res.statusCode = code; return res; });
   res.type = jest.fn(() => res);
   res.send = jest.fn((body: string) => { res.body = body; return res; });
+  res.redirect = jest.fn();
   return res;
 }
 
@@ -20,6 +23,7 @@ const GOOD_PASSWORD = 'Motdepasse12!';
 describe('AuthController', () => {
   let controller: AuthController;
   let users: { isPasswordResetTokenValid: jest.Mock; verifyPasswordResetToken: jest.Mock };
+  let auth: { createGoogleCode: jest.Mock };
 
   beforeEach(async () => {
     users = {
@@ -27,12 +31,14 @@ describe('AuthController', () => {
       verifyPasswordResetToken: jest.fn(),
     };
 
+    auth = { createGoogleCode: jest.fn().mockResolvedValue('c0de') };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
-        { provide: AuthService, useValue: {} },
+        { provide: AuthService, useValue: auth },
         { provide: UsersService, useValue: users },
-        { provide: ConfigService, useValue: { get: () => undefined } },
+        { provide: ConfigService, useValue: { get: (key: string) => (key === 'OAUTH_APP_REDIRECT' ? 'exp://' : undefined) } },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -131,6 +137,39 @@ describe('AuthController', () => {
 
       expect(res.statusCode).toBe(400);
       expect(res.body).toContain('expiré');
+    });
+  });
+
+  describe('GET /auth/google/web/callback', () => {
+    const challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+    const redirect = 'exp://10.0.2.2:8081/--/auth';
+    const state = encodeFlowState({ redirect, challenge });
+
+    it('renvoie l\'app avec un code, jamais le jwt', async () => {
+      const identity = { googleId: 'g', email: 'bob@gmail.com', username: 'bob' };
+      const res = fakeRes();
+
+      await controller.googleCallback({ user: identity }, state, res);
+
+      expect(auth.createGoogleCode).toHaveBeenCalledWith(identity, challenge);
+      expect(res.redirect).toHaveBeenCalledWith(`${redirect}#code=c0de`);
+    });
+
+    it('renvoie l\'app avec l\'erreur si google a echoue', async () => {
+      const res = fakeRes();
+
+      await controller.googleCallback({ user: null, googleError: 'Google sign-in was cancelled' }, state, res);
+
+      expect(auth.createGoogleCode).not.toHaveBeenCalled();
+      expect(res.redirect).toHaveBeenCalledWith(`${redirect}#error=Google%20sign-in%20was%20cancelled`);
+    });
+
+    it('refuse un state forge vers une adresse hors liste', async () => {
+      const forged = encodeFlowState({ redirect: 'https://evil.com', challenge });
+
+      await expect(controller.googleCallback({ user: { googleId: 'g' } }, forged, fakeRes()))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(auth.createGoogleCode).not.toHaveBeenCalled();
     });
   });
 });

@@ -9,6 +9,8 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
@@ -18,6 +20,7 @@ describe('AuthService', () => {
   let users: Record<string, jest.Mock>;
   let mail: { sendVerificationEmail: jest.Mock; sendPasswordResetEmail: jest.Mock };
   let cache: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
+  let config: Record<string, string>;
 
   beforeEach(async () => {
     users = {
@@ -33,6 +36,7 @@ describe('AuthService', () => {
       availableUsername: jest.fn(),
     };
     cache = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+    config = {};
     mail = {
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
@@ -44,13 +48,15 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: users },
         { provide: JwtService, useValue: { sign: () => 'jwt' } },
         { provide: MailService, useValue: mail },
-        { provide: ConfigService, useValue: {} },
+        { provide: ConfigService, useValue: { get: (key: string) => config[key] } },
         { provide: CACHE_MANAGER, useValue: cache },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
   });
+
+  afterEach(() => jest.restoreAllMocks());
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -106,13 +112,22 @@ describe('AuthService', () => {
       expect(users.attachGoogle).not.toHaveBeenCalled();
     });
 
-    it('lie automatiquement un compte qui a la meme adresse', async () => {
+    it('lie automatiquement un compte verifie qui a la meme adresse', async () => {
       users.findByGoogleId.mockResolvedValue(null);
-      users.findByEmail.mockResolvedValue({ id: 7, username: 'bob', email: 'bob@gmail.com' });
+      users.findByEmail.mockResolvedValue({ id: 7, username: 'bob', email: 'bob@gmail.com', emailisVerified: true });
 
       await service.handleGoogleUser(identity);
 
       expect(users.attachGoogle).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), identity);
+      expect(users.create).not.toHaveBeenCalled();
+    });
+
+    it('ne rattache pas google a un compte dont l\'adresse n\'est pas verifiee', async () => {
+      users.findByGoogleId.mockResolvedValue(null);
+      users.findByEmail.mockResolvedValue({ id: 7, email: 'bob@gmail.com', password: 'hash', emailisVerified: false });
+
+      await expect(service.handleGoogleUser(identity)).rejects.toBeInstanceOf(ConflictException);
+      expect(users.attachGoogle).not.toHaveBeenCalled();
       expect(users.create).not.toHaveBeenCalled();
     });
 
@@ -129,37 +144,73 @@ describe('AuthService', () => {
       }));
     });
 
-    describe('liaison depuis un compte existant', () => {
-      it('le ticket porte l\'id du user et expire', async () => {
-        const { ticket } = await service.createGoogleLinkTicket(7);
+    const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+    const challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 
-        expect(ticket).toMatch(/^[a-f0-9]{48}$/);
-        expect(cache.set).toHaveBeenCalledWith(`google-link:${ticket}`, 7, expect.any(Number));
+    describe('code rendu a l\'app apres google', () => {
+      it('garde l\'identite et le challenge sous un code qui expire', async () => {
+        const code = await service.createGoogleCode(identity, challenge);
+
+        expect(code).toMatch(/^[a-f0-9]{48}$/);
+        expect(cache.set).toHaveBeenCalledWith(`google-code:${code}`, { identity, challenge }, expect.any(Number));
       });
 
-      it('refuse un ticket inconnu ou expire', async () => {
+      it('echange le code contre un jwt avec le bon verifier', async () => {
+        cache.get.mockResolvedValue({ identity, challenge });
+        users.findByGoogleId.mockResolvedValue({ id: 7, username: 'bob' });
+
+        await expect(service.exchangeGoogleCode('c', verifier)).resolves.toEqual({ access_token: 'jwt' });
+        expect(cache.del).toHaveBeenCalledWith('google-code:c');
+      });
+
+      it('refuse un mauvais verifier et grille le code', async () => {
+        cache.get.mockResolvedValue({ identity, challenge });
+        const other = createHash('sha256').update('autre').digest('hex');
+
+        await expect(service.exchangeGoogleCode('c', other)).rejects.toBeInstanceOf(UnauthorizedException);
+        expect(cache.del).toHaveBeenCalledWith('google-code:c');
+        expect(users.findByGoogleId).not.toHaveBeenCalled();
+      });
+
+      it('refuse un code inconnu, expire ou deja utilise', async () => {
         cache.get.mockResolvedValue(undefined);
-        await expect(service.linkGoogle('nope', identity)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.exchangeGoogleCode('nope', verifier)).rejects.toBeInstanceOf(UnauthorizedException);
+      });
+    });
+
+    describe('liaison depuis un compte existant', () => {
+      it('refuse un code inconnu ou expire', async () => {
+        cache.get.mockResolvedValue(undefined);
+        await expect(service.linkGoogle(7, 'nope', verifier)).rejects.toBeInstanceOf(UnauthorizedException);
         expect(users.attachGoogle).not.toHaveBeenCalled();
       });
 
       it('refuse un compte google deja lie a quelqu\'un d\'autre', async () => {
-        cache.get.mockResolvedValue(7);
+        cache.get.mockResolvedValue({ identity, challenge });
         users.findByGoogleId.mockResolvedValue({ id: 99 });
 
-        await expect(service.linkGoogle('t', identity)).rejects.toBeInstanceOf(ConflictException);
+        await expect(service.linkGoogle(7, 'c', verifier)).rejects.toBeInstanceOf(ConflictException);
         expect(users.attachGoogle).not.toHaveBeenCalled();
       });
 
-      it('lie le compte google et consomme le ticket', async () => {
-        cache.get.mockResolvedValue(7);
+      it('lie le compte google au user connecte et consomme le code', async () => {
+        cache.get.mockResolvedValue({ identity, challenge });
         users.findByGoogleId.mockResolvedValue(null);
         users.findById.mockResolvedValue({ id: 7, email: 'bob@test.local' });
 
-        await service.linkGoogle('t', identity);
+        await service.linkGoogle(7, 'c', verifier);
 
-        expect(cache.del).toHaveBeenCalledWith('google-link:t');
+        expect(cache.del).toHaveBeenCalledWith('google-code:c');
         expect(users.attachGoogle).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }), identity);
+      });
+    });
+
+    describe('id token', () => {
+      it('rend un 401 et pas un 500 pour un token invalide', async () => {
+        config.GOOGLE_CLIENT_ID_WEB = 'web-client';
+        jest.spyOn(OAuth2Client.prototype as any, 'verifyIdToken').mockRejectedValue(new Error('Wrong number of segments'));
+
+        await expect(service.verifyGoogleToken('pas-un-jwt')).rejects.toBeInstanceOf(UnauthorizedException);
       });
     });
 

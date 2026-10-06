@@ -11,7 +11,6 @@ import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import { type ApiPlaylist, listMyPlaylists, createPlaylist, deletePlaylist } from '../lib/playlists';
 
-// list of my playlists (owned + shared) with create and delete
 export default function PlaylistsScreen({ navigation }: any) {
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -118,8 +117,8 @@ export default function PlaylistsScreen({ navigation }: any) {
                 </Text>
                 {item.isOwner === false && (
                   <View style={styles.sharedBadge}>
-                    <Ionicons name="people" size={11} color={colors.textSecondary} />
-                    <Text style={styles.meta}>Shared</Text>
+                    <Ionicons name="person" size={11} color={colors.textSecondary} />
+                    <Text style={styles.meta} numberOfLines={1}>{item.owner.username}</Text>
                   </View>
                 )}
               </View>

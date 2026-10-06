@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as WebBrowser from 'expo-web-browser';
 import { colors, radius, spacing, typography } from '../config/theme';
 import { ui } from '../config/ui';
-import { apiFetch, getApiUrl } from '../config/api';
+import { apiFetch } from '../config/api';
+import { linkGoogleAccount, runGoogleFlow } from '../lib/googleAuth';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import Button from './Button';
@@ -15,36 +15,21 @@ type Props = {
   onChange: () => void;
 };
 
-// sujet v.1 : lier un compte google a un compte deja cree. meme flux que
-// GoogleSignInButton, avec un ticket en plus pour que le back sache qui lie
 export default function GoogleLinkCard({ googleEmail, hasPassword, onChange }: Props) {
   const { token } = useAuth();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
 
-  // 1) ask a ticket 2) open google with it 3) read the result in the url fragment
   async function link() {
     setBusy(true);
     try {
-      const { ticket } = await apiFetch('/auth/google/link-ticket', token, { method: 'POST' });
-      // on web google come back to our origin (native = default redirect)
-      const appUrl = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
-      const result = await WebBrowser.openAuthSessionAsync(
-        `${getApiUrl()}/auth/google/web?link=${encodeURIComponent(ticket)}`,
-        appUrl,
-      );
+      const flow = await runGoogleFlow();
       // closed or canceled = nothing to do
-      if (result.type !== 'success')
+      if (!flow)
         return;
-
-      // le back renvoie ...#linked=1 ou ...#linkError=<message>
-      const params = new URLSearchParams(result.url.split('#')[1] ?? '');
-      if (params.get('linked')) {
-        showToast({ type: 'success', message: 'Google account linked' });
-        onChange();
-      } else {
-        showToast({ type: 'error', message: params.get('linkError') || 'Google linking failed' });
-      }
+      await linkGoogleAccount(token, flow);
+      showToast({ type: 'success', message: 'Google account linked' });
+      onChange();
     } catch (e: any) {
       showToast({ type: 'error', message: e.message });
     } finally {

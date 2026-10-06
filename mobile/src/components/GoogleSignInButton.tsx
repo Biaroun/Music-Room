@@ -1,59 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as WebBrowser from 'expo-web-browser';
 import { colors, radius, spacing, typography } from '../config/theme';
-import { getApiUrl } from '../config/api';
+import { exchangeGoogleCode, runGoogleFlow } from '../lib/googleAuth';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import PressableCard from './PressableCard';
 
-// close the auth popup when we come back on web
-WebBrowser.maybeCompleteAuthSession();
-
-/**
- * sujet v.5 : l'app doit proposer une connexion via un reseau social.
- *
- * on passe par le flux du backend (/auth/google/web) plutot que de parler a
- * google directement : la seule uri de redirection enregistree dans la console
- * cloud est celle du callback backend. l'app ouvre donc ce flux, google renvoie
- * au backend, le backend cree notre jwt et redirige vers l'app avec le token
- * dans le fragment (OAUTH_APP_REDIRECT cote back).
- *
- * demander l'id token depuis l'app aurait impose d'enregistrer une seconde uri
- * chez google, celle de l'app elle-meme.
- */
 export default function GoogleSignInButton({ label = 'Continue with Google' }: { label?: string }) {
     const { login: authLogin } = useAuth();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
 
-    /** le backend renvoie ...#token=<jwt> */
-    function tokenFromUrl(url: string): string | null {
-        const hash = url.split('#')[1];
-        if (!hash) return null;
-        const found = new URLSearchParams(hash).get('token');
-        return found || null;
-    }
-
-    // open the backend google flow then login with the token from the url
     async function signIn() {
         setLoading(true);
         try {
-            // on web google come back to our origin (native = default redirect)
-            const appUrl = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
-            const result = await WebBrowser.openAuthSessionAsync(`${getApiUrl()}/auth/google/web`, appUrl);
-
-            if (result.type !== 'success') return; // l'utilisateur a ferme la fenetre
-
-            const token = tokenFromUrl(result.url);
-            if (!token) {
-                showToast({ type: 'error', message: 'Google sign-in did not return a session' });
-                return;
-            }
-            await authLogin(token);
-        } catch {
-            showToast({ type: 'error', message: 'Google sign-in failed' });
+            const flow = await runGoogleFlow();
+            if (!flow) return;
+            await authLogin(await exchangeGoogleCode(flow));
+        } catch (e: any) {
+            showToast({ type: 'error', message: e?.message || 'Google sign-in failed' });
         } finally {
             setLoading(false);
         }

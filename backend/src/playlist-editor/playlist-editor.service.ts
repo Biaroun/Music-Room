@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Playlist, PlaylistLicenseMode } from './playlist.entity';
 import { PlaylistTrack } from './playlist-track.entity';
 import { PlaylistCollaborator } from './playlist-collaborator.entity';
@@ -45,7 +45,6 @@ export class PlaylistEditorService {
         return this.playlists.save(playlist);
     }
 
-    // my playlists AND the ones where im an editor
     async findMine(userId: number) {
         // tracks charge juste pour le compteur affiche cote mobile
         const owned = await this.playlists.find({
@@ -69,10 +68,21 @@ export class PlaylistEditorService {
               })
             : [];
 
+        const publicOthers = await this.playlists.find({
+            where: {
+                isPublic: true,
+                owner: { id: Not(userId) },
+                ...(sharedIds.length ? { id: Not(In(sharedIds)) } : {}),
+            },
+            relations: { tracks: true, owner: true },
+            select: { owner: { id: true, username: true } },
+            order: { createdAt: 'DESC' },
+        });
+
         // isOwner : le mobile masque renommage, visibilite et suppression dessus
         return [
             ...owned.map((playlist) => ({ ...playlist, isOwner: true })),
-            ...shared.map((playlist) => ({ ...playlist, isOwner: false })),
+            ...[...shared, ...publicOthers].map((playlist) => ({ ...playlist, isOwner: false })),
         ];
     }
 

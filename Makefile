@@ -18,14 +18,18 @@ stop:
 	@pkill -f "[n]est start" 2>/dev/null || true
 	@# nest --watch lance le serveur dans un process a part qui survit sinon et garde le port 3000
 	@pkill -f "[b]ackend/dist/main" 2>/dev/null || true
+	@pkill -f "[a]ndroid-reverse.sh --watch" 2>/dev/null || true
 
 re: stop start
 
 dev-back:
 	cd backend && npm run start:dev
 
-dev-mobile:
+dev-mobile: android-reverse
 	cd mobile && npx expo start
+
+android-reverse:
+	@./scripts/android-reverse.sh
 
 dev-web:
 	cd mobile && npx expo start --web

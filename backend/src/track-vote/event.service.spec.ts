@@ -250,5 +250,21 @@ describe('EventService', () => {
 
       await expect(service.update(10, OTHER_USER, {} as any)).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('lets the owner delete an event created while premium even after cancelling', async () => {
+      const event = baseEvent();
+      events.findOne.mockResolvedValue(event);
+      subscription.isPremium.mockResolvedValue(false);
+
+      await expect(service.remove(10, owner.id)).resolves.toBeUndefined();
+      expect(events.remove).toHaveBeenCalledWith(event);
+    });
+
+    it('still rejects a non-owner deleting the event', async () => {
+      events.findOne.mockResolvedValue(baseEvent());
+
+      await expect(service.remove(10, OTHER_USER)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(events.remove).not.toHaveBeenCalled();
+    });
   });
 });

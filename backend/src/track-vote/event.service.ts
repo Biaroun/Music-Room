@@ -123,10 +123,15 @@ export class EventService {
         return event;
     }
 
-    // load the event if im the owner AND still premium
-    private async findManageable(id: number, ownerId: number): Promise<Event> {
+    private async findOwned(id: number, ownerId: number): Promise<Event> {
         const event = await this.findOne(id);
         if (event.owner.id !== ownerId) throw new ForbiddenException('Not your event');
+        return event;
+    }
+
+    // load the event if im the owner AND still premium
+    private async findManageable(id: number, ownerId: number): Promise<Event> {
+        const event = await this.findOwned(id, ownerId);
         // un event cree pendant l'abonnement reste a l'owner, mais devient
         // ineditable s'il resilie : la gestion exige le plan premium a chaque
         // action, pas seulement a la creation.
@@ -147,7 +152,7 @@ export class EventService {
 
     // delete an event
     async remove(id: number, ownerId: number): Promise<void> {
-        const event = await this.findManageable(id, ownerId);
+        const event = await this.findOwned(id, ownerId);
         await this.events.remove(event);
     }
 

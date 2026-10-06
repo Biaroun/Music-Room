@@ -9,7 +9,6 @@ import {
     UseGuards,
     Headers as NestHeaders,
     Req,
-    Logger
 } from '@nestjs/common';
 import {RegisterDto} from "./dto/register.dto";
 import {AuthService} from "./auth.service";
@@ -27,13 +26,13 @@ import {ResetPasswordDto} from "./dto/ResetPassword.dto";
 import {ConfigService} from "@nestjs/config";
 import {ThrottleAuth} from "./auth-throttle";
 import {AllowUnverified} from "./decorators/allow-unverified.decorator";
+import {GoogleCodeDto, GoogleIdTokenDto} from "./dto/google.dto";
+import {decodeFlowState, isAllowedAppRedirect} from "./google-flow";
 
 // all the /auth routes
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-    private readonly logger = new Logger(AuthController.name);
-
     constructor(private authService: AuthService,
                 private usersService: UsersService,
                 private config: ConfigService) {}
@@ -117,65 +116,57 @@ export class AuthController {
     }
 
     // GET /auth/google/web empty on purpose (the guard redirect to google)
-    @ApiOperation({ summary: 'Redirect to Google OAuth (add ?link=<ticket> to link instead of log in)' })
-    @ApiQuery({ name: 'link', required: false, description: 'Ticket from POST /auth/google/link-ticket' })
+    @ApiOperation({ summary: 'Redirect to Google OAuth, then back to the app with #code=... (or #error=...)' })
+    @ApiQuery({ name: 'redirect', required: true, description: 'App url to come back to, must be allowed by OAUTH_APP_REDIRECT' })
+    @ApiQuery({ name: 'challenge', required: true, description: 'PKCE challenge: base64url sha256 of a verifier kept by the app' })
+    @ApiResponse({ status: 400, description: 'redirect not allowed or challenge malformed' })
     @Get('google/web')
     @UseGuards(GoogleAuthGuard)
     async googleAuth() {}
 
-    /**
-     * google renvoie ici, sur la seule uri enregistree dans la console cloud.
-     * on echange, on cree notre jwt, puis on redirige vers l'app avec le token
-     * dans le fragment : un fragment n'est jamais envoye au serveur, donc il ne
-     * finit ni dans les logs d'acces ni dans un en-tete Referer.
-     *
-     * la cible de redirection vient de la configuration, jamais d'un parametre
-     * de la requete : sinon n'importe qui pourrait se faire renvoyer le jwt
-     * d'un utilisateur sur son propre site (open redirect).
-     */
+    @ApiExcludeEndpoint()
     @Get('google/web/callback')
     @UseGuards(GoogleAuthGuard)
     async googleCallback(@Req() req: any, @Query('state') state: string, @Res() res: Response) {
-        const appUrl = this.config.get<string>('OAUTH_APP_REDIRECT');
+        const flow = decodeFlowState(state);
+        if (!flow || !isAllowedAppRedirect(flow.redirect, this.config.get<string>('OAUTH_APP_REDIRECT')))
+            throw new BadRequestException('Invalid Google sign-in request, start again from the app');
 
-        // retour d'une liaison : pas de nouveau jwt, l'app est deja connectee
-        if (state) {
-            let fragment = 'linked=1';
-            try {
-                await this.authService.linkGoogle(state, req.user);
-            } catch (e: any) {
-                fragment = `linkError=${encodeURIComponent(e.message)}`;
-            }
-            return appUrl ? res.redirect(`${appUrl}#${fragment}`) : res.json({ result: fragment });
-        }
+        const fragment = req.user
+            ? `code=${await this.authService.createGoogleCode(req.user, flow.challenge)}`
+            : `error=${encodeURIComponent(req.googleError ?? 'Google sign-in failed')}`;
+        return res.redirect(`${flow.redirect}#${fragment}`);
+    }
 
-        const { access_token } = await this.authService.handleGoogleUser(req.user);
-        if (!appUrl) {
-            // pas d'app configuree : on rend le token tel quel, utile pour
-            // tester la route au navigateur. on previent, sinon l'utilisateur
-            // voit un json et croit a un bug de l'app
-            this.logger.warn(
-                'OAUTH_APP_REDIRECT absent : le token est renvoye en json au lieu de repartir vers l\'app',
-            );
-            return res.json({ access_token });
-        }
-        return res.redirect(`${appUrl}#token=${encodeURIComponent(access_token)}`);
+    @ApiOperation({ summary: 'Log in with the code returned by the Google flow' })
+    @ApiResponse({ status: 201, description: 'Login successful' })
+    @ApiResponse({ status: 401, description: 'Code unknown, expired, already used or wrong verifier' })
+    @ApiResponse({ status: 409, description: 'An unverified account already uses this email' })
+    @ThrottleAuth()
+    @Post('google/exchange')
+    async googleExchange(@Body() dto: GoogleCodeDto) {
+        return await this.authService.exchangeGoogleCode(dto.code, dto.verifier);
     }
 
     // POST /auth/google/mobile login with a google id token from the app
+    @ApiOperation({ summary: 'Log in with a Google id token (native Google sign-in)' })
+    @ApiResponse({ status: 401, description: 'Invalid Google token' })
+    @ThrottleAuth()
     @Post('google/mobile')
-    async googleMobile(@Body() body: { token: string }) {
-        const identity = await this.authService.verifyGoogleToken(body.token);
+    async googleMobile(@Body() dto: GoogleIdTokenDto) {
+        const identity = await this.authService.verifyGoogleToken(dto.token);
         return await this.authService.handleGoogleUser(identity);
     }
 
-    // POST /auth/google/link ticket to start the google link flow
-    @ApiOperation({ summary: 'Get a one-time ticket to link a Google account (then open /auth/google/web?link=<ticket>)' })
+    @ApiOperation({ summary: 'Link the Google account from the Google flow code to the logged-in user' })
     @ApiBearerAuth()
+    @ApiResponse({ status: 401, description: 'Code unknown, expired, already used or wrong verifier' })
+    @ApiResponse({ status: 409, description: 'This Google account is already linked to another account' })
+    @ThrottleAuth()
     @UseGuards(JwtAuthGuard)
-    @Post('google/link-ticket')
-    async googleLinkTicket(@Req() req: any) {
-        return await this.authService.createGoogleLinkTicket(req.user.id);
+    @Post('google/link')
+    async googleLink(@Req() req: any, @Body() dto: GoogleCodeDto) {
+        return await this.authService.linkGoogle(req.user.id, dto.code, dto.verifier);
     }
 
     // DELETE /auth/google/link remove the google link

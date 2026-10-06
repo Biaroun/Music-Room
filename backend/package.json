@@ -18,7 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "start:all": "concurrently --names \"BACK,MOBILE\" --prefix-colors \"green,cyan\" \"npm run start:dev\" \"cd ../mobile && npx expo start --android\""
+    "start:all": "concurrently --names \"BACK,MOBILE,ADB\" --prefix-colors \"green,cyan,gray\" \"npm run start:dev\" \"cd ../mobile && npx expo start --android\" \"../scripts/android-reverse.sh --watch\""
   },
   "dependencies": {
     "@keyv/redis": "^5.1.6",

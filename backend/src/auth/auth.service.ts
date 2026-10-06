@@ -19,9 +19,14 @@ import type { Cache } from 'cache-manager';
 import { Inject } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import {ConfigService} from "@nestjs/config";
+import {verifierMatches} from "./google-flow";
 
-// google link ticket live 5 min
-const GOOGLE_LINK_TICKET_TTL_MS = 5 * 60_000;
+const GOOGLE_CODE_TTL_MS = 60_000;
+
+interface PendingGoogleSignIn {
+  identity: GoogleIdentity;
+  challenge: string;
+}
 
 // all the auth logic (register login logout google reset password)
 @Injectable()
@@ -108,8 +113,11 @@ export class AuthService {
 
     if (!user) {
       user = await this.usersService.findByEmail(identity.email);
-      if (user)
+      if (user) {
+        if (!user.emailisVerified)
+          throw new ConflictException('An unverified account already uses this email: log in with its password or use "Forgot password", then verify the email');
         await this.usersService.attachGoogle(user, identity);
+      }
     }
 
     if (!user) {
@@ -128,24 +136,28 @@ export class AuthService {
     };
   }
 
-  // sujet v.1 : lier google a un compte existant. le jwt ne survit pas aux
-  // redirections du navigateur, donc l'app demande d'abord ce ticket (jwt
-  // requis), qui traverse google dans le parametre state. usage unique, 5 min,
-  // et jamais le jwt lui-meme dans une url
-  async createGoogleLinkTicket(userId: number): Promise<{ ticket: string }> {
-    const ticket = randomBytes(24).toString('hex');
-    await this.cacheManager.set(`google-link:${ticket}`, userId, GOOGLE_LINK_TICKET_TTL_MS);
-    return { ticket };
+  async createGoogleCode(identity: GoogleIdentity, challenge: string): Promise<string> {
+    const code = randomBytes(24).toString('hex');
+    const pending: PendingGoogleSignIn = { identity, challenge };
+    await this.cacheManager.set(`google-code:${code}`, pending, GOOGLE_CODE_TTL_MS);
+    return code;
   }
 
-  // link the google account to the user who asked the ticket
-  async linkGoogle(ticket: string, identity: GoogleIdentity): Promise<void> {
-    const key = `google-link:${ticket}`;
-    const userId = await this.cacheManager.get<number>(key);
-    // delete right away so the ticket is single use
+  private async redeemGoogleCode(code: string, verifier: string): Promise<GoogleIdentity> {
+    const key = `google-code:${code}`;
+    const pending = await this.cacheManager.get<PendingGoogleSignIn>(key);
     await this.cacheManager.del(key);
-    if (!userId)
-      throw new BadRequestException('Link request expired, start again from the app');
+    if (!pending || !verifierMatches(verifier, pending.challenge))
+      throw new UnauthorizedException('Google sign-in expired, start again from the app');
+    return pending.identity;
+  }
+
+  async exchangeGoogleCode(code: string, verifier: string): Promise<{ access_token: string }> {
+    return await this.handleGoogleUser(await this.redeemGoogleCode(code, verifier));
+  }
+
+  async linkGoogle(userId: number, code: string, verifier: string): Promise<{ message: string }> {
+    const identity = await this.redeemGoogleCode(code, verifier);
 
     const owner = await this.usersService.findByGoogleId(identity.googleId);
     if (owner && owner.id !== userId)
@@ -155,6 +167,7 @@ export class AuthService {
     if (!user)
       throw new UnauthorizedException();
     await this.usersService.attachGoogle(user, identity);
+    return { message: 'Google account linked' };
   }
 
   // remove the google link from the account
@@ -186,12 +199,13 @@ export class AuthService {
       throw new UnauthorizedException('Google sign-in is not configured on this server');
     }
 
-    const ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: audiences,
-    });
-
-    const payload = ticket.getPayload();
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({ idToken: token, audience: audiences });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Invalid Google token');
+    }
     // une adresse non verifiee chez google ne prouve rien : on ne s'en sert pas
     // pour rattacher un compte existant
     if (!payload?.email || !payload.email_verified) {
