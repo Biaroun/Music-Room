@@ -5,7 +5,7 @@
 **Application mobile collaborative pour écouter, voter et construire des playlists à plusieurs, en temps réel.**
 
 [![CI](https://github.com/Biaroun/Music-Room/actions/workflows/ci.yml/badge.svg)](https://github.com/Biaroun/Music-Room/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/tag/Biaroun/Music-Room?label=version&sort=semver)](https://github.com/Biaroun/Music-Room/tags)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](CHANGELOG.md)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)
