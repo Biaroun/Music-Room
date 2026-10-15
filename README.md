@@ -1,196 +1,316 @@
-# Music Room 🎵
+<div align="center">
 
-Application mobile collaborative autour de la musique : vote en direct sur la file d'un événement et édition de playlists à plusieurs en temps réel.
+# 🎵 Music Room
 
-- **Backend** : NestJS (TypeScript), PostgreSQL, Redis, Socket.IO
-- **Mobile** : React Native / Expo (Android, iOS et web)
-- **Services implémentés** : Music Track Vote et Music Playlist Editor (le sujet en demande 2 sur 3)
+**Application mobile collaborative pour écouter, voter et construire des playlists à plusieurs, en temps réel.**
+
+[![CI](https://github.com/Biaroun/Music-Room/actions/workflows/ci.yml/badge.svg)](https://github.com/Biaroun/Music-Room/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/tag/Biaroun/Music-Room?label=version&sort=semver)](https://github.com/Biaroun/Music-Room/tags)
+![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)
+![Expo](https://img.shields.io/badge/Expo-56-000020?logo=expo&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+
+[Fonctionnalités](#-fonctionnalités) •
+[Architecture](#-architecture) •
+[Démarrage rapide](#-démarrage-rapide) •
+[API](#-api) •
+[Sécurité](#-sécurité) •
+[Tests & CI](#-qualité-tests-et-ci) •
+[Performances](#-performances)
+
+</div>
 
 ---
 
-## Lancer le projet
+## 📖 À propos
+
+**Music Room** est un projet de l'école 42 : une application mobile (Android, iOS et web) adossée à une API NestJS, qui permet à un groupe de personnes de **décider ensemble de la musique**.
+
+Deux services sont implémentés (le sujet en demande 2 sur 3) :
+
+| Service | En bref |
+|---|---|
+| 🗳️ **Music Track Vote** | Une file de morceaux par événement. Chacun propose des titres et vote ; les plus votés remontent et passent en premier. |
+| 📝 **Music Playlist Editor** | Édition d'une playlist à plusieurs, en direct, avec gestion des conflits d'édition. |
+
+La recherche de morceaux et les extraits audio s'appuient sur l'API publique **Deezer**.
+
+## ✨ Fonctionnalités
+
+**Comptes et social**
+- Inscription par e-mail / mot de passe avec **validation par mail**, mot de passe oublié
+- Connexion et **liaison de compte Google** (OAuth 2.0 + PKCE)
+- Profil avec **visibilité par champ** (public, amis, privé) et goûts musicaux
+- **Système d'amis** : demandes, acceptation, refus, blocage, et « ce que mes amis écoutent » en direct
+
+**Track Vote**
+- Événements **publics ou privés**, avec invitations
+- Trois licences de vote : `open`, `invite-only`, `geo-time-restricted` (zone géographique + plage horaire)
+- Import d'une playlist existante dans la file d'un événement
+- Classement recalculé côté serveur et diffusé à tous les participants
+
+**Playlist Editor**
+- Playlists **publiques ou privées**, édition `open` ou `invite-only`, collaborateurs
+- Ajout, suppression et réordonnancement en temps réel (une room Socket.IO par playlist)
+- **Contrôle de concurrence optimiste** : versionnage de la playlist, rejet des modifications périmées (`playlist:conflict`)
+
+**Bonus**
+- 🌐 **Web responsive** : la même app Expo tourne dans le navigateur
+- 💎 **Abonnement Free / Premium** (sans paiement) : seuls les comptes Premium créent des événements, vérifié côté serveur
+
+## 🏗 Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client["📱 App Expo (Android · iOS · Web)"]
+        UI[Écrans React Native]
+        RT[Socket.IO client]
+    end
+
+    subgraph API["⚙️ Backend NestJS"]
+        REST[REST + Swagger]
+        WS["WebSocket /realtime"]
+        MOD[Modules : auth · users · friendship<br/>track-vote · playlist-editor · listening<br/>subscription · mail · logs]
+    end
+
+    DZ[(API Deezer)]
+    PG[(PostgreSQL 15)]
+    RD[(Redis 7)]
+    G[Google OAuth]
+    SMTP[SMTP / Ethereal]
+
+    UI -- HTTPS JSON + JWT --> REST
+    RT <-- événements temps réel --> WS
+    UI -- recherche / extraits --> DZ
+    REST --> MOD
+    WS --> MOD
+    MOD --> PG
+    MOD --> RD
+    MOD --> G
+    MOD --> SMTP
+```
+
+| Couche | Choix | Pourquoi |
+|---|---|---|
+| Backend | **NestJS 11** (TypeScript) | Architecture modulaire, injection de dépendances, Swagger généré depuis les décorateurs |
+| Base de données | **PostgreSQL 15** + TypeORM | Données relationnelles et contraintes d'unicité, sur lesquelles repose la gestion des votes simultanés |
+| Cache / état éphémère | **Redis 7** | Liste noire des JWT révoqués, morceau en cours d'écoute |
+| Temps réel | **Socket.IO** | Diffusion des votes et des modifications de playlist sans polling |
+| Mobile | **React Native 0.85 / Expo 56** | Un seul code pour Android, iOS et le web |
+
+### Structure du dépôt
+
+```
+Music-Room/
+├── backend/                 # API NestJS
+│   ├── src/
+│   │   ├── auth/            # JWT, Google OAuth, validation mail, reset password
+│   │   ├── users/           # profils et visibilité des champs
+│   │   ├── friendship/      # amis, demandes, blocage
+│   │   ├── track-vote/      # événements, votes, licences, géo-restriction
+│   │   ├── playlist-editor/ # playlists collaboratives temps réel
+│   │   ├── listening/       # « en écoute » partagé avec les amis
+│   │   ├── subscription/    # offres Free / Premium
+│   │   ├── mail/            # envoi des mails (Ethereal ou SMTP)
+│   │   └── logs/            # journal de chaque requête HTTP / WS
+│   ├── test/                # tests e2e
+│   └── requests/            # requêtes .http prêtes à l'emploi
+├── mobile/                  # App Expo (screens, components, context, lib)
+├── scripts/                 # setup .env, comptes de test, tests de charge
+├── docs/                    # montée en charge, sécurité, specs de conception
+├── docker-compose.yml       # Postgres + Redis
+└── Makefile                 # point d'entrée de toutes les commandes
+```
+
+## 🚀 Démarrage rapide
 
 ### Prérequis
 
-- Node.js 24 et npm
-- Docker + Docker Compose (Postgres et Redis)
+- [Node.js 24](https://nodejs.org/) et npm (voir [`.nvmrc`](.nvmrc))
+- [Docker](https://www.docker.com/) + Docker Compose
 - Un émulateur Android, un simulateur iOS ou un navigateur
 
-### Installation et démarrage
+### Installation
 
 ```bash
-make install      # crée les .env depuis les modèles, puis npm install (backend + mobile)
-make start        # lance Postgres + Redis (docker), le backend et Expo
-make stop         # arrête tout
+git clone https://github.com/Biaroun/Music-Room.git
+cd Music-Room
+make install   # crée les .env depuis les modèles puis installe backend + mobile
+make start     # Postgres + Redis (Docker), backend et Expo
 ```
 
-Pour lancer chaque partie séparément :
+| Commande | Effet |
+|---|---|
+| `make docker-up` / `make docker-down` | Démarre / arrête Postgres (port `5433`) et Redis (port `6380`) |
+| `make dev-back` | Backend en mode watch sur http://localhost:3000 |
+| `make dev-mobile` | Expo pour Android / iOS |
+| `make dev-web` | Expo dans le navigateur |
+| `make seed-users` | Crée 3 comptes de test vérifiés et amis (`seed_alice`, `seed_bob`, `seed_carol`) |
+| `make check` | Types, build, tests unitaires et e2e (identique à la CI) |
+| `make stop` | Arrête tout |
 
-```bash
-make docker-up    # Postgres (port 5433) + Redis (port 6380)
-make dev-back     # backend sur http://localhost:3000
-make dev-mobile   # Expo (Android / iOS)
-make dev-web      # Expo dans le navigateur
-```
+> Les mots de passe des comptes de test sont générés aléatoirement et écrits dans `backend/.env.seed-users` (ignoré par git).
 
-Aucune bibliothèque tierce n'est commitée : tout s'installe via `npm install` depuis `package.json` (sujet IV.1).
+### Configuration
 
-### Configuration (`.env`)
+`make install` copie [`backend/.env.exemple`](backend/.env.exemple) vers `backend/.env`. Aucun secret n'est commité.
 
-`make install` copie `backend/.env.exemple` vers `backend/.env` s'il n'existe pas encore. Les fichiers `.env` sont ignorés par git : aucun identifiant n'est commité (sujet V.8).
-
-| Variable | À quoi elle sert |
+| Variable | Rôle |
 |---|---|
 | `DATABASE_URL`, `REDIS_URL` | Déjà alignées sur `docker-compose.yml` |
-| `JWT_SECRET` | Secret de signature des tokens, à changer |
-| `GOOGLE_CLIENT_ID_*`, `GOOGLE_CLIENT_SECRET_WEB` | Connexion Google : identifiants à créer dans la Google Cloud Console |
-| `OAUTH_APP_REDIRECT` | Adresses de l'app (web, `musicroom://`, `exp://` en dev) vers lesquelles le backend a le droit de renvoyer après Google, séparées par des virgules |
-| `MAIL_*` | Envoi des mails (voir ci-dessous) |
-| `THROTTLE_*` | Limitation des requêtes (voir Sécurité) |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | Signature et durée de vie des tokens (**à changer**) |
+| `GOOGLE_CLIENT_ID_*`, `GOOGLE_CLIENT_SECRET_WEB`, `GOOGLE_CALLBACK_URL_WEB` | Connexion Google (Google Cloud Console) |
+| `OAUTH_APP_REDIRECT` | Adresses de retour autorisées après Google (`http://localhost:8082,musicroom://,exp://`) |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | Envoi des mails |
+| `THROTTLE_TTL_MS`, `THROTTLE_LIMIT`, `THROTTLE_ALLOWLIST` | Limitation de débit par IP |
 
-### Mails
+<details>
+<summary><b>📧 Mails en développement (Ethereal)</b></summary>
 
-Par défaut (`MAIL_HOST=ethereal`), les mails passent par [Ethereal](https://ethereal.email), un faux serveur SMTP de test. Rien n'arrive dans une vraie boîte : à chaque envoi, le backend affiche dans ses logs un **lien de prévisualisation** du mail. C'est ce lien qu'il faut ouvrir pour valider un compte ou réinitialiser un mot de passe.
+Par défaut (`MAIL_HOST=ethereal`), les mails passent par [Ethereal](https://ethereal.email), un faux serveur SMTP. Rien n'arrive dans une vraie boîte : le backend affiche dans ses logs un **lien de prévisualisation** pour chaque mail (validation de compte, reset de mot de passe).
 
-- Avec `MAIL_USER` / `MAIL_PASSWORD` renseignés, la boîte Ethereal est fixe et consultable sur [ethereal.email/login](https://ethereal.email/login).
-- Sans ces variables, une boîte jetable est créée à chaque démarrage ; son identifiant est affiché au lancement du backend.
-- Pour un vrai fournisseur SMTP (Brevo, etc.), renseigner `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` et `MAIL_FROM`.
+- Avec `MAIL_USER` / `MAIL_PASSWORD`, la boîte est fixe et consultable sur [ethereal.email/login](https://ethereal.email/login).
+- Sans, une boîte jetable est créée à chaque démarrage.
+- Pour un vrai fournisseur (Brevo, etc.), renseigner les variables `MAIL_*`.
 
-### Adresse du backend dans l'app (sujet V.5)
+</details>
 
-L'adresse du backend se change **depuis l'application**, via l'écran **Server** accessible depuis l'écran de connexion. L'app vérifie que l'adresse répond et que c'est bien l'API Music Room avant de l'enregistrer.
+<details>
+<summary><b>📱 Adresse du backend depuis l'app</b></summary>
+
+L'adresse de l'API se change **dans l'application**, via l'écran **Server** accessible depuis la connexion. L'app vérifie qu'il s'agit bien de l'API Music Room avant de l'enregistrer.
 
 | Contexte | Adresse |
 |---|---|
-| Émulateur Android | `http://10.0.2.2:3000` (par défaut) |
+| Émulateur Android | `http://10.0.2.2:3000` (défaut) |
 | Navigateur / simulateur iOS | `http://localhost:3000` |
 | Téléphone physique (même Wi-Fi) | `http://<IP_DE_LA_MACHINE>:3000` |
 
-La valeur par défaut peut aussi être fixée au build avec `EXPO_PUBLIC_API_URL` dans `mobile/.env`.
+La valeur par défaut peut être fixée au build avec `EXPO_PUBLIC_API_URL` dans `mobile/.env`. Si le port 3000 est pris, le backend bascule sur le suivant.
 
-> Si le port 3000 est déjà pris, le backend passe automatiquement au port suivant et l'affiche au démarrage.
+</details>
 
-> **Connexion Google sur mobile** : Google renvoie toujours sur `GOOGLE_CALLBACK_URL_WEB` (`http://localhost:3000/...`). Sur l'émulateur Android (ou un téléphone branché en USB), `localhost` désigne l'appareil : `make start` et `make dev-mobile` lancent `adb reverse tcp:3000 tcp:3000` pour que cette adresse atteigne le backend. Si l'émulateur a démarré après, ou a redémarré : `make android-reverse`. Sur un téléphone physique, il faut une URL publique en HTTPS (tunnel type ngrok), déclarée comme URI de redirection dans la console Google et reprise dans `GOOGLE_CALLBACK_URL_WEB`. Sous Expo Go, `OAUTH_APP_REDIRECT` doit contenir `exp://`.
+<details>
+<summary><b>🔑 Connexion Google sur mobile</b></summary>
 
-### Comptes de test
+Google renvoie toujours sur `GOOGLE_CALLBACK_URL_WEB` (`http://localhost:3000/...`). Sur émulateur Android ou téléphone en USB, `make start` / `make dev-mobile` lancent `adb reverse tcp:3000 tcp:3000` (relançable avec `make android-reverse`). Sur un téléphone physique sans câble, il faut une URL publique HTTPS (tunnel type ngrok) déclarée dans la console Google. Sous Expo Go, `OAUTH_APP_REDIRECT` doit contenir `exp://`.
 
-```bash
-make seed-users   # backend lancé au préalable
-```
+</details>
 
-Crée trois comptes déjà vérifiés et amis entre eux (`seed_alice`, `seed_bob`, `seed_carol`). Les mots de passe sont générés aléatoirement et écrits dans `backend/.env.seed-users` (ignoré par git).
+## 📡 API
 
----
-
-## Documentation de l'API (sujet V.4)
-
-La documentation Swagger est générée automatiquement à partir du code : méthodes, entrées, sorties et codes de retour.
+La documentation **Swagger / OpenAPI** est générée automatiquement depuis le code :
 
 - Interface : **http://localhost:3000/api/docs**
 - JSON OpenAPI : http://localhost:3000/api/docs-json
 
-**REST + JSON** : REST s'appuie sur les verbes et codes HTTP standard, ce qui rend l'API lisible et facile à documenter et à tester (Swagger, curl). JSON est natif en JavaScript, des deux côtés. Le temps réel (votes, édition de playlist) passe en complément par **WebSocket (Socket.IO)**, sur le namespace `/realtime`, parce qu'en REST pur le client devrait interroger le serveur en boucle.
+Des requêtes prêtes à l'emploi sont disponibles dans [`backend/requests/`](backend/requests) (format `.http`, VS Code REST Client / JetBrains).
 
----
+### REST
 
-## Correspondance avec le sujet
-
-### V.1 Utilisateur
-
-| Exigence | Implémentation |
+| Ressource | Routes principales |
 |---|---|
-| Inscription mail / mot de passe | `POST /auth/register`, écran Register |
-| Inscription / connexion par réseau social | Google (le sujet demande Facebook **ou** Google) : l'app ouvre `GET /auth/google/web` dans le navigateur, revient avec un code à usage unique et l'échange avec `POST /auth/google/exchange` (PKCE). `POST /auth/google/mobile` accepte aussi un id token Google |
-| Lier un compte existant à Google | Même flux Google, puis `POST /auth/google/link` avec le JWT ; déliaison avec `DELETE /auth/google/link` |
-| Validation du mail | Mail envoyé à l'inscription ; tant qu'il n'est pas validé, l'app n'affiche que l'écran de vérification (renvoi possible) |
-| Mot de passe oublié | `POST /auth/forgot-password`, lien par mail vers un formulaire de réinitialisation |
-| Profil : infos publiques, amis, privées, goûts musicaux | Chaque champ du profil a sa propre visibilité : public, amis seulement ou privé. Goûts musicaux choisis parmi une liste de genres. Système d'amis (demandes, acceptation) |
+| `/auth` | `register`, `login`, `logout`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`, `google/web`, `google/exchange`, `google/mobile`, `google/link` |
+| `/users` | `GET /me`, `PATCH /me`, `PATCH /me/email`, `PATCH /me/password`, `GET /search`, `GET /:id` |
+| `/friendship` | demandes (`request/:id`, `:id/accept`, `:id/reject`), blocage, `friends`, `pending`, `blocked` |
+| `/track-vote/events` | CRUD des événements, invitations |
+| `/track-vote/events/:id` | `board`, `tracks`, `import-playlist`, `vote` |
+| `/playlist-editor` | CRUD des playlists, `tracks`, `tracks/reorder`, `collaborators` |
+| `/listening` | `PUT /me`, `DELETE /me`, `GET /friends` |
+| `/subscription` | `subscribe`, `cancel` |
 
-### V.2.1 Music Track Vote
+### Temps réel (Socket.IO, namespace `/realtime`)
 
-- Chacun peut **proposer** un morceau ou importer une de ses playlists ; les morceaux les plus votés remontent dans la file et passent en premier.
-- **Visibilité** : événement public par défaut, visible et votable par tous ; un événement privé n'est visible que des invités.
-- **Licences** : `open` (tout le monde vote, par défaut), `invite-only` (seuls les invités votent), `geo-time-restricted` (seuls les utilisateurs présents dans une zone, définie par un point et un rayon, et pendant une plage horaire votent).
-- **Concurrence** : un vote est une ligne unique (événement, votant, morceau) insérée avec `INSERT … ON CONFLICT DO NOTHING`. Deux votes simultanés ne peuvent ni se dupliquer ni s'écraser ; plusieurs personnes peuvent voter en même temps pour des morceaux différents ou pour le même. Le classement est recalculé côté serveur et diffusé à tous les participants.
+| Client → serveur | Serveur → client |
+|---|---|
+| `event:join`, `event:leave`, `vote:cast`, `vote:retract` | `vote:board`, `vote:error` |
+| `playlist:join`, `playlist:leave`, `playlist:track:add`, `playlist:track:remove`, `playlist:reorder` | `playlist:state`, `playlist:conflict`, `playlist:error` |
+| `listening:update`, `listening:stop` | `listening:snapshot`, `listening:changed`, `listening:stopped` |
 
-### V.2.3 Music Playlist Editor
+**Pourquoi REST + WebSocket ?** REST s'appuie sur les verbes et codes HTTP standard : l'API est lisible, simple à documenter et à tester. Le temps réel passe par WebSocket, sinon le client devrait interroger le serveur en boucle.
 
-- **Visibilité** : playlist publique par défaut, accessible à tous ; une playlist privée n'est accessible qu'aux invités.
-- **Licences** : `open` (tout le monde édite, par défaut) ou `invite-only` (seuls les invités éditent). La lecture et l'édition sont réglées séparément.
-- **Temps réel** : une room Socket.IO par playlist ; chaque modification renvoie l'état complet à tous les éditeurs connectés.
-- **Concurrence** : la playlist porte un numéro de version, incrémenté à chaque modification. Un déplacement de morceaux envoyé sur une version périmée est refusé (`playlist:conflict`) : seul son auteur reçoit l'état à jour, les autres ne voient rien changer.
+### Gestion de la concurrence
 
-### V.2.2 Music Control Delegation
+- **Votes** : un vote est une ligne unique `(événement, votant, morceau)` insérée avec `INSERT … ON CONFLICT DO NOTHING`. Deux votes simultanés ne peuvent ni se dupliquer ni s'écraser.
+- **Playlists** : chaque playlist porte un numéro de version incrémenté à chaque modification. Un réordonnancement envoyé sur une version périmée est refusé et seul son auteur reçoit l'état à jour.
 
-Non implémenté : le sujet demande 2 services sur 3.
-
-### V.3 Serveur
-
-Toutes les données sont stockées côté backend (PostgreSQL), qui fait référence. L'app mobile ne fait que piloter l'API.
-
-**Choix techniques :**
-
-- **NestJS** : TypeScript sur le backend comme sur le mobile ; architecture en modules, injection de dépendances, génération de Swagger à partir des décorateurs.
-- **PostgreSQL** : données relationnelles (utilisateurs, amis, playlists, votes) et contraintes d'unicité, sur lesquelles repose la gestion des votes simultanés.
-- **Redis** : liste noire des tokens révoqués et état éphémère, comme le morceau en cours de lecture.
-- **React Native / Expo** : un seul code pour Android, iOS et le web.
-
----
-
-## Sécurité (sujet V.6)
+## 🔒 Sécurité
 
 | Risque | Protection |
 |---|---|
-| Accès aux données d'autrui | Routes protégées par JWT ; chaque accès est vérifié contre l'utilisateur connecté (propriétaire, invité, ami). Les champs de profil respectent leur visibilité |
-| Bruteforce | Limitation par IP : 300 req/min sur toutes les routes, beaucoup moins sur les routes d'authentification. Le test e2e vérifie qu'après 5 échecs de connexion l'API répond `429` |
-| Vol de session | Tokens JWT à durée limitée ; à la déconnexion, le token est placé en liste noire dans Redis (refusé en HTTP comme en WebSocket) |
-| Mots de passe | Hachés avec bcrypt, jamais renvoyés par l'API |
-| Injection / champs inattendus | Validation de toutes les entrées (`ValidationPipe` en mode `whitelist`), requêtes paramétrées via TypeORM |
-| Redirection ouverte et vol du retour Google | L'adresse de retour doit figurer dans `OAUTH_APP_REDIRECT`. Elle reçoit un code d'une minute, à usage unique, échangeable seulement avec le vérificateur PKCE gardé par l'app : un code intercepté ne sert à rien, et le JWT ne passe jamais dans une URL. Google n'est jamais rattaché par e-mail à un compte dont l'adresse n'est pas vérifiée |
+| Accès aux données d'autrui | Routes protégées par JWT, contrôle propriétaire / invité / ami à chaque accès, visibilité des champs de profil respectée |
+| Bruteforce | Rate limiting par IP (300 req/min global, bien plus strict sur l'authentification), vérifié en e2e (`429` après 5 échecs) |
+| Vol de session | JWT à durée limitée, mis en **liste noire Redis** à la déconnexion (HTTP et WebSocket) |
+| Mots de passe | Hachés avec **bcrypt**, jamais renvoyés par l'API |
+| Injection / champs inattendus | `ValidationPipe` en mode `whitelist`, requêtes paramétrées via TypeORM |
+| OAuth | Redirections en liste blanche, code à usage unique d'une minute échangé avec un vérificateur **PKCE**, le JWT ne passe jamais dans une URL |
+| Comptes non vérifiés | Bloqués sur les routes protégées tant que l'e-mail n'est pas validé |
 | Secrets | Uniquement dans des `.env` ignorés par git |
 
-### Logs (sujet V.6)
-
-Chaque action, requête HTTP comme message WebSocket, est enregistrée dans la table `log` avec la **plateforme**, l'**appareil** et la **version de l'app** (envoyés par l'app mobile dans les en-têtes `x-client-*`), plus l'utilisateur, le statut, la durée et l'IP.
+Chaque action (HTTP comme WebSocket) est journalisée dans la table `log` avec la plateforme, l'appareil et la version de l'app (en-têtes `x-client-*`), l'utilisateur, le statut, la durée et l'IP :
 
 ```bash
 docker compose exec postgres psql -U postgres -d musicroom \
   -c 'SELECT action, platform, device, "appVersion", "statusCode", "createdAt" FROM log ORDER BY id DESC LIMIT 20;'
 ```
 
----
+Plus de détails dans [`docs/securite.md`](docs/securite.md).
 
-## Montée en charge (sujet V.7)
-
-Méthode, caractéristiques de la machine et résultats détaillés dans **[docs/ramp-up.md](docs/ramp-up.md)**.
-
-**Résultat : 600 utilisateurs simultanés** (~1 500 req/s, 0 % d'erreur) sur un seul processus Node, avec un i9-13900H et 32 Go de RAM.
-
-```bash
-make load-seed    # crée le pool de comptes (voir la doc pour THROTTLE_ALLOWLIST)
-make load-test    # campagne par paliers, en Node, sans dépendance à installer
-```
-
----
-
-## Qualité et intégration continue (sujet V.8)
+## ✅ Qualité, tests et CI
 
 ```bash
 make docker-up
-make check        # types + build + tests unitaires + tests e2e (backend), types (mobile)
+make check   # backend : types + build + tests unitaires + e2e · mobile : types
 ```
 
-La CI GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) lance exactement la même chose à chaque push, avec un vrai Postgres et un vrai Redis.
+La [CI GitHub Actions](.github/workflows/ci.yml) exécute exactement la même chose à chaque push, avec un vrai PostgreSQL et un vrai Redis.
+
+## 📈 Performances
+
+Campagne de montée en charge reproductible, méthode et résultats complets dans [`docs/ramp-up.md`](docs/ramp-up.md).
+
+> **600 utilisateurs simultanés · ~1 500 req/s · 0 % d'erreur** sur un seul processus Node (i9-13900H, 32 Go).
+
+```bash
+make load-seed   # crée le pool de comptes
+make load-test   # campagne par paliers, en Node, sans dépendance
+```
+
+## 🗺 Correspondance avec le sujet
+
+| Section | État |
+|---|---|
+| V.1 Utilisateur (inscription, Google, validation mail, profil, amis) | ✅ |
+| V.2.1 Music Track Vote | ✅ |
+| V.2.2 Music Control Delegation | ➖ Non retenu (2 services sur 3 demandés) |
+| V.2.3 Music Playlist Editor | ✅ |
+| V.3 Serveur de référence | ✅ |
+| V.4 Documentation de l'API | ✅ Swagger |
+| V.5 Adresse du backend réglable | ✅ |
+| V.6 Sécurité et logs | ✅ |
+| V.7 Montée en charge | ✅ |
+| V.8 Qualité et CI | ✅ |
+| VI.1 Multi-plateforme (web responsive) | ✅ Bonus |
+| VI.2 IoT / iBeacon | ❌ |
+| VI.3 Abonnement Free / Premium | ✅ Bonus |
+| VI.4 Mode hors ligne | ❌ |
+
+## 🤝 Contribuer
+
+Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour les conventions de branches, de commits et le workflow de PR. L'historique des versions est dans [CHANGELOG.md](CHANGELOG.md).
+
+## 👥 Auteurs
+
+| | |
+|---|---|
+| **Bilal Aroun** | [@Biaroun](https://github.com/Biaroun) |
+| **Thomas Benelgorch** | [@Neo677](https://github.com/Neo677) |
 
 ---
 
-## Bonus
-
-| Bonus | État |
-|---|---|
-| VI.1 Multi-plateforme (web responsive) | ✅ La même app Expo tourne dans le navigateur (`make dev-web`). Le contenu est centré avec une largeur maximale sur grand écran, et les listes de playlists et d'événements passent en 2 colonnes au-delà de 700 px |
-| VI.3 Abonnement gratuit / payant | ✅ Deux offres : **Free** (rejoindre les événements et voter) et **Premium** (créer et gérer des événements Track Vote). Bascule sans paiement depuis **Settings → Subscription**, ou via `POST /subscription/subscribe` / `POST /subscription/cancel`, avec un mail de confirmation. La restriction est vérifiée côté serveur : un compte Free qui crée un événement reçoit `403` |
-| VI.2 IoT / iBeacon | ❌ Non implémenté. La géolocalisation sert uniquement à la licence « lieu + horaire » du vote |
-| VI.4 Mode hors ligne | ❌ Non implémenté |
-
-> Pour créer un événement Track Vote, il faut donc d'abord passer le compte en Premium.
+<div align="center">
+<sub>Projet réalisé dans le cadre du cursus <b>42</b>.</sub>
+</div>

@@ -1,0 +1,16 @@
+# Normalise les fins de ligne en LF dans le depot
+* text=auto eol=lf
+
+# Scripts shell : toujours LF, meme sous Windows
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Binaires
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.wasm binary
+
+# Lockfiles : pas de diff ligne a ligne dans les PR
+package-lock.json linguist-generated=true -diff
