@@ -32,7 +32,7 @@
     "@nestjs/platform-socket.io": "^11.1.21",
     "@nestjs/swagger": "^11.4.3",
     "@nestjs/throttler": "^6.5.0",
-    "@nestjs/typeorm": "^11.0.1",
+    "@nestjs/typeorm": "^12.0.2",
     "@nestjs/websockets": "^11.1.21",
     "bcrypt": "^6.0.0",
     "cache-manager": "^7.2.8",
